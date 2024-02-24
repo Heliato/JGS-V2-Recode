@@ -4,8 +4,31 @@
 #include <time.h>
 #include <vector>
 
+enum ENetMode
+{
+	NM_Standalone,
+	NM_DedicatedServer,
+	NM_ListenServer,
+	NM_Client,
+	NM_MAX,
+};
+
 namespace Hooks
 {
+	static ENetMode ReturnDedicatedServer() {
+		return ENetMode::NM_DedicatedServer;
+	}
+
+	static void SetGIsServer(bool value)
+	{
+		*(bool*)(__int64(GetModuleHandleW(0)) + 0x4BF6F18) = value;
+	}
+
+	static void SetGIsClient(bool value)
+	{
+		*(bool*)(__int64(GetModuleHandleW(0)) + 0x4BF6F17) = value;
+	}
+
 	FGameplayAbilitySpec* FindAbilitySpecFromHandle(UAbilitySystemComponent* AbilitySystem, FGameplayAbilitySpecHandle Handle)
 	{
 		for (int i = 0; i < AbilitySystem->ActivatableAbilities.Items.Num(); i++)
@@ -29,10 +52,39 @@ namespace Hooks
 	bool bHasInitedTheBeacon = false;
 
 	LPVOID(*ProcessEvent)(void*, void*, void*);
-	LPVOID ProcessEventHook(UObject* pObject, UFunction* pFunction, LPVOID pParams)
+	LPVOID ProcessEventHook(UObject* Object, UFunction* Function, LPVOID Parms)
 	{
-		auto ObjName = pObject->GetName();
-		auto FuncName = pFunction->GetName();
+		auto FuncName = Function->GetName();
+
+		if (FuncName.contains("ReadyToStartMatch"))
+		{
+			if (!bHasInitedTheBeacon) {
+				Globals::FortEngine = UObject::FindObject<UFortEngine>("FortEngine_");
+				Globals::World = Globals::FortEngine->GameViewport->World;
+				Globals::PC = reinterpret_cast<AFortPlayerController*>(Globals::FortEngine->GameInstance->LocalPlayers[0]->PlayerController);
+
+				auto BaseAddr = Util::BaseAddress();
+
+				MH_CreateHook((LPVOID)(BaseAddr + 0x249c7c0), ReturnDedicatedServer, nullptr);
+				MH_EnableHook((LPVOID)(BaseAddr + 0x249c7c0));
+				MH_CreateHook((LPVOID)(BaseAddr + 0x1ecbf80), ReturnDedicatedServer, nullptr);
+				MH_EnableHook((LPVOID)(BaseAddr + 0x1ecbf80));
+
+				SetGIsClient(false);
+				SetGIsServer(true);
+
+				Beacons::InitHooks(); // Sets up the beacon and inits replication for use!
+
+				bHasInitedTheBeacon = true;
+				Globals::World->AuthorityGameMode->GameSession->MaxPlayers = 100;
+
+				((AGameMode*)Globals::World->AuthorityGameMode)->StartMatch();
+
+				Globals::PC->CheatManager->DestroyAll(APlayerController::StaticClass());
+
+				StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Abilities/Player/Constructor/Perks/ContainmentUnit/GE_Constructor_ContainmentUnit_Applied.GE_Constructor_ContainmentUnit_Applied_C");
+			}
+		}
 
 		if (FuncName.find("AircraftExitedDropZone") != std::string::npos)
 		{
@@ -52,53 +104,11 @@ namespace Hooks
 			}
 		}
 
-		if (FuncName.contains("ReadyToStartMatch"))
-		{
-			if (!bHasInitedTheBeacon) {
-				Globals::FortEngine = UObject::FindObject<UFortEngine>("FortEngine_");
-				Globals::World = Globals::FortEngine->GameViewport->World;
-				Globals::PC = reinterpret_cast<AFortPlayerController*>(Globals::FortEngine->GameInstance->LocalPlayers[0]->PlayerController);
-
-				Beacons::InitHooks(); //Sets up the beacon and inits replication for use!
-
-				bHasInitedTheBeacon = true;
-				Globals::World->AuthorityGameMode->GameSession->MaxPlayers = 100;
-
-#ifdef DUOS
-				((AFortGameStateAthena*)Globals::World->GameState)->CurrentPlaylistId = 10;
-#endif
-
-#ifdef DBNO_ENABLED
-				((AFortGameModeAthena*)Globals::World->AuthorityGameMode)->bAlwaysDBNO = true;
-#endif
-				((AGameMode*)Globals::World->AuthorityGameMode)->StartMatch();
-
-				Globals::PC->CheatManager->DestroyAll(APlayerController::StaticClass());
-
-				StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Abilities/Player/Constructor/Perks/ContainmentUnit/GE_Constructor_ContainmentUnit_Applied.GE_Constructor_ContainmentUnit_Applied_C");
-			}
-		}
-
-#ifdef LOG_RPCS
-		if (pFunction->FunctionFlags & 0x01000000 || pFunction->FunctionFlags & 0x00200000 &&
-			!FuncName.contains("UpdateCamera") &&
-			!FuncName.contains("NoBase"))
-		{
-			if (!FuncName.contains("ClientAckGoodMove") &&
-				!FuncName.contains("ServerMove") &&
-				!FuncName.contains("ClientAdjustPosition"))
-			{
-				LOG("RPC: " << FuncName);
-			}
-		}
-#endif
-
-		/////////// RPCS ////////////
 
 		if (FuncName.contains("ServerTryActivateAbility"))
 		{
-			auto Params = (UAbilitySystemComponent_ServerTryActivateAbility_Params*)pParams;
-			auto AbilitySystemComp = (UAbilitySystemComponent*)pObject;
+			auto Params = (UAbilitySystemComponent_ServerTryActivateAbility_Params*)Parms;
+			auto AbilitySystemComp = (UAbilitySystemComponent*)Object;
 
 			auto AbilityToActivate = Params->AbilityToActivate;
 			auto PredictionKey = Params->PredictionKey;
@@ -115,11 +125,11 @@ namespace Hooks
 		
 		if (FuncName.contains("ServerExecuteInventoryItem"))
 		{
-			auto PC = (AFortPlayerControllerAthena*)pObject;
-			auto Params = (AFortPlayerController_ServerExecuteInventoryItem_Params*)pParams;
+			auto PC = (AFortPlayerControllerAthena*)Object;
+			auto Params = (AFortPlayerController_ServerExecuteInventoryItem_Params*)Parms;
 
 			if (PC->IsInAircraft())
-				return ProcessEvent(pObject, pFunction, pParams);
+				return ProcessEvent(Object, Function, Parms);
 
 			if (PC)
 			{
@@ -133,14 +143,14 @@ namespace Hooks
 
 		if (FuncName.contains("ServerReturnToMainMenu"))
 		{
-			auto PC = (AFortPlayerController*)pObject;
+			auto PC = (AFortPlayerController*)Object;
 			PC->ClientTravel(L"/Game/Maps/Frontend", ETravelType::TRAVEL_Absolute, false, FGuid());
 		}
 
 		if (FuncName.contains("ServerHandlePickup"))
 		{
-			auto Pawn = (AFortPlayerPawn*)pObject;
-			auto Params = (AFortPlayerPawn_ServerHandlePickup_Params*)pParams;
+			auto Pawn = (AFortPlayerPawn*)Object;
+			auto Params = (AFortPlayerPawn_ServerHandlePickup_Params*)Parms;
 
 			if (Pawn)
 			{
@@ -236,8 +246,8 @@ namespace Hooks
 
 		if (FuncName.contains("ServerSpawnInventoryDrop"))
 		{
-			auto PC = (AFortPlayerControllerAthena*)pObject;
-			auto Params = (AFortPlayerController_ServerSpawnInventoryDrop_Params*)pParams;
+			auto PC = (AFortPlayerControllerAthena*)Object;
+			auto Params = (AFortPlayerController_ServerSpawnInventoryDrop_Params*)Parms;
 
 			if (PC->IsInAircraft())
 				return NULL;
@@ -334,7 +344,7 @@ namespace Hooks
 
 		if (FuncName.contains("ServerAttemptAircraftJump"))
 		{
-			auto PC = (AFortPlayerControllerAthena*)pObject;
+			auto PC = (AFortPlayerControllerAthena*)Object;
 
 			auto NewPawn = (APlayerPawn_Athena_C*)(Util::SpawnActor(APlayerPawn_Athena_C::StaticClass(), ((AFortGameStateAthena*)Globals::World->GameState)->GetAircraft()->K2_GetActorLocation(), {}));
 			if (NewPawn) {
@@ -354,7 +364,7 @@ namespace Hooks
 				NewPawn->ShieldRegenGameplayEffect = nullptr;
 				NewPawn->HealthRegenGameplayEffect = nullptr;
 
-				PC->SetControlRotation(((AFortPlayerControllerAthena_ServerAttemptAircraftJump_Params*)pParams)->ClientRotation);
+				PC->SetControlRotation(((AFortPlayerControllerAthena_ServerAttemptAircraftJump_Params*)Parms)->ClientRotation);
 
 				FindInventory(PC)->UpdateInventory();
 			}
@@ -362,8 +372,8 @@ namespace Hooks
 
 		if (FuncName.contains("ServerAbilityRPCBatch"))
 		{
-			auto AbilityComp = (UAbilitySystemComponent*)pObject;
-			auto CurrentParams = (UAbilitySystemComponent_ServerAbilityRPCBatch_Params*)pParams;
+			auto AbilityComp = (UAbilitySystemComponent*)Object;
+			auto CurrentParams = (UAbilitySystemComponent_ServerAbilityRPCBatch_Params*)Parms;
 
 			UGameplayAbility* InstancedAbility = nullptr;
 			if (!InternalTryActivateAbilityLong(AbilityComp, CurrentParams->BatchInfo.AbilitySpecHandle, CurrentParams->BatchInfo.PredictionKey, &InstancedAbility, nullptr, nullptr))
@@ -374,7 +384,7 @@ namespace Hooks
 
 		if (FuncName.contains("ServerLoadingScreenDropped"))
 		{
-			auto PC = (AFortPlayerController*)pObject;
+			auto PC = (AFortPlayerController*)Object;
 			auto Pawn = (APlayerPawn_Athena_C*)PC->Pawn;
 			if (!Pawn)
 				return NULL;
@@ -384,8 +394,8 @@ namespace Hooks
 
 		if (FuncName.contains("ServerAttemptInteract"))
 		{
-			auto PlayerController = (AFortPlayerControllerAthena*)pObject;
-			auto CurrentParams = (AFortPlayerController_ServerAttemptInteract_Params*)pParams;
+			auto PlayerController = (AFortPlayerControllerAthena*)Object;
+			auto CurrentParams = (AFortPlayerController_ServerAttemptInteract_Params*)Parms;
 
 			auto ReceivingActor = CurrentParams->ReceivingActor;
 			if (!ReceivingActor)
@@ -394,7 +404,7 @@ namespace Hooks
 			if (ReceivingActor->IsA(ABuildingContainer::StaticClass()))
 			{
 				if (((ABuildingContainer*)ReceivingActor)->bAlreadySearched)
-					return ProcessEvent(pObject, pFunction, pParams);
+					return ProcessEvent(Object, Function, Parms);
 			}
 
 			if (ReceivingActor && ReceivingActor->Class->GetName().contains("Tiered_Short_Ammo"))
@@ -632,7 +642,7 @@ namespace Hooks
 
 		if (FuncName.contains("ClientOnPawnDied"))
 		{
-			auto PC = (AFortPlayerControllerAthena*)pObject;
+			auto PC = (AFortPlayerControllerAthena*)Object;
 			auto Pawn = PC->Pawn;
 
 			if (PC && PC->WorldInventory != nullptr)
@@ -648,11 +658,11 @@ namespace Hooks
 
 		if (FuncName.contains("OnDamageServer"))
 		{
-			if (!pObject->IsA(ABuildingSMActor::StaticClass()))
-				return ProcessEvent(pObject, pFunction, pParams);
+			if (!Object->IsA(ABuildingSMActor::StaticClass()))
+				return ProcessEvent(Object, Function, Parms);
 
-			auto BuildingActor = (ABuildingSMActor*)pObject;
-			auto Params = (ABuildingActor_OnDamageServer_Params*)pParams;
+			auto BuildingActor = (ABuildingSMActor*)Object;
+			auto Params = (ABuildingActor_OnDamageServer_Params*)Parms;
 
 			if (Params->InstigatedBy && Params->InstigatedBy->IsA(AFortPlayerController::StaticClass()) && !BuildingActor->bPlayerPlaced)
 			{
@@ -665,8 +675,8 @@ namespace Hooks
 
 		if (FuncName.contains("ClientReportDamagedResourceBuilding"))
 		{
-			auto PC = (AFortPlayerControllerAthena*)pObject;
-			auto Params = (AFortPlayerController_ClientReportDamagedResourceBuilding_Params*)pParams;
+			auto PC = (AFortPlayerControllerAthena*)Object;
+			auto Params = (AFortPlayerController_ClientReportDamagedResourceBuilding_Params*)Parms;
 
 			if (PC && Params)
 			{
@@ -720,7 +730,7 @@ namespace Hooks
 
 		if (FuncName.contains("ServerCreateBuildingActor"))
 		{
-			auto params = (AFortPlayerController_ServerCreateBuildingActor_Params*)(pParams);
+			auto params = (AFortPlayerController_ServerCreateBuildingActor_Params*)(Parms);
 			auto BuildClass = params->BuildingClassData.BuildingClass;
 			auto Loc = params->BuildLoc;
 			auto Rot = params->BuildRot;
@@ -728,9 +738,9 @@ namespace Hooks
 			auto BuildingActor = (ABuildingSMActor*)Util::SpawnActor(BuildClass, Loc, Rot);
 			if (BuildingActor)
 			{
-				auto PC = (AFortPlayerController*)(pObject);
+				auto PC = (AFortPlayerController*)(Object);
 				
-				BuildingActor->Team = ((AFortPlayerStateAthena*)((AFortPlayerController*)pObject)->PlayerState)->TeamIndex;
+				BuildingActor->Team = ((AFortPlayerStateAthena*)((AFortPlayerController*)Object)->PlayerState)->TeamIndex;
 				BuildingActor->bPlayerPlaced = true;
 				BuildingActor->ForceNetUpdate();
 				BuildingActor->InitializeKismetSpawnedBuildingActor(BuildingActor, PC);
@@ -789,7 +799,7 @@ namespace Hooks
 
 		if (FuncName.contains("ReceiveDestroyed"))
 		{
-			auto Actor = (AActor*)pObject;
+			auto Actor = (AActor*)Object;
 
 			if (Globals::World->NetDriver) {
 				for (int i = 0; i < Globals::World->NetDriver->ClientConnections.Num(); i++)
@@ -810,7 +820,7 @@ namespace Hooks
 
 		/////////// RPCS ////////////
 
-		return ProcessEvent(pObject, pFunction, pParams);
+		return ProcessEvent(Object, Function, Parms);
 	}
 
 	void Init()
