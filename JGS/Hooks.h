@@ -15,46 +15,437 @@ enum ENetMode
 
 namespace Hooks
 {
-	static ENetMode ReturnDedicatedServer() {
+	__int64 (*PickupInitialize)(AFortPickup* Pickup, FFortItemEntry ItemEntry, TArray<FFortItemEntry> MultiItemPickupEntries, bool bSplitOnPickup);
+	void (*PickupCombine)(__int64 a1, __int64 a2);
+
+	char sub_7FF66CA1FB60Hook(AFortGameModeAthena* a1)
+	{
+		return 1;
+	}
+
+	void PostGameplayEffectExecuteHook(UFortRegenHealthSet* HealthSet, __int64 a2)
+	{
+		LOG("PostGameplayEffectExecuteHook");
+
+		LOG("HealthSet: " << HealthSet->GetName());
+
+		return;
+	}
+
+	static ENetMode GetNetModeHook() {
 		return ENetMode::NM_DedicatedServer;
 	}
 
-	static void SetGIsServer(bool value)
-	{
-		*(bool*)(__int64(GetModuleHandleW(0)) + 0x4BF6F18) = value;
+	static ENetMode InternalGetNetModeHook() {
+		return ENetMode::NM_DedicatedServer;
 	}
 
-	static void SetGIsClient(bool value)
+	static inline int64_t GIsServer()
 	{
-		*(bool*)(__int64(GetModuleHandleW(0)) + 0x4BF6F17) = value;
+		return __int64(GetModuleHandleW(0)) + 0x6536b66;
 	}
 
-	FGameplayAbilitySpec* FindAbilitySpecFromHandle(UAbilitySystemComponent* AbilitySystem, FGameplayAbilitySpecHandle Handle)
+	static inline int64_t GIsClient()
 	{
-		for (int i = 0; i < AbilitySystem->ActivatableAbilities.Items.Num(); i++)
-		{
-			auto Spec = AbilitySystem->ActivatableAbilities.Items[i];
-
-			if (Spec.Handle.Handle == Handle.Handle)
-			{
-				return &Spec;
-			}
-		}
-
-		return nullptr;
+		return __int64(GetModuleHandleW(0)) + 0x6536b65;
 	}
 
-	char (*InternalTryActivateAbilityLong)(UAbilitySystemComponent* AbilitySystemComp, FGameplayAbilitySpecHandle AbilityToActivate, FPredictionKey InPredictionKey, UGameplayAbility** OutInstancedAbility, void* OnGameplayAbilityEndedDelegate, const FGameplayEventData* TriggerEventData);
-
+	bool bLogs = false;
 	bool bIsReady = false;
 	bool bHasSpawned = false;
 	bool bIsInGame = false;
 	bool bHasInitedTheBeacon = false;
+	bool bSetupCharPartArray = false;
+	bool bSetupFloorLoot = false;
+	bool bEverythingSearched = false;
 
 	LPVOID(*ProcessEvent)(void*, void*, void*);
 	LPVOID ProcessEventHook(UObject* Object, UFunction* Function, LPVOID Parms)
 	{
 		auto FuncName = Function->GetName();
+
+		if (FuncName.contains("Tick"))
+		{
+			if (GetAsyncKeyState(VK_F7) & 0x1)
+			{
+				bLogs = bLogs ? false : true;
+			}
+
+#ifdef CHEATS
+			if (GetAsyncKeyState(VK_F6) & 0x1)
+			{
+				auto World = Globals::FortEngine->GameViewport->World;
+				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
+
+				Inventory* PlayerInventory = FindInventory((AFortPlayerController*)PlayerController);
+
+				if (PlayerInventory)
+				{
+					PlayerInventory->DropAllItemsFromInventory();
+				}
+			}
+
+			if (GetAsyncKeyState(VK_F5) & 0x1)
+			{
+				auto World = Globals::FortEngine->GameViewport->World;
+				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
+
+				Inventory* PlayerInventory = FindInventory((AFortPlayerController*)PlayerController);
+
+				if (PlayerInventory)
+				{
+					PlayerInventory->RemoveAllItemsFromInventory();
+					PlayerInventory->UpdateInventory();
+				}
+			}
+
+			if (GetAsyncKeyState(VK_F4) & 0x1)
+			{
+				LOG("NetworkActors: " << Replication::NetworkActors.size());
+			}
+
+			if (GetAsyncKeyState(VK_F3) & 0x1)
+			{
+				auto World = Globals::FortEngine->GameViewport->World;
+				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
+
+				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+
+				if (Pawn && PlayerInventory)
+				{
+					for (int i = 0; i < PlayerController->QuickBars->PrimaryQuickBar.Slots.Num(); i++)
+					{
+						FQuickBarSlot Slot = PlayerController->QuickBars->PrimaryQuickBar.Slots[i];
+
+						for (int j = 0; j < Slot.Items.Num(); j++)
+						{
+							if (Slot.Items.IsValidIndex(j) && PlayerInventory->GetItemInstance(Slot.Items[j]))
+							{
+								LOG("[" << i << "] ItemDefinition: " << PlayerInventory->GetItemInstance(Slot.Items[j])->GetItemDefinitionBP()->GetName());
+							}
+							else
+							{
+								LOG("[" << i << "] AvaibleSlot");
+							}
+						}
+					}
+				}
+			}
+
+			if (GetAsyncKeyState(VK_F2) & 0x1)
+			{
+				auto World = Globals::FortEngine->GameViewport->World;
+				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
+
+				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+
+				if (Pawn && PlayerInventory)
+				{
+					for (int i = 0; i < PlayerController->QuickBars->SecondaryQuickBar.Slots.Num(); i++)
+					{
+						FQuickBarSlot Slot = PlayerController->QuickBars->SecondaryQuickBar.Slots[i];
+
+						for (int j = 0; j < Slot.Items.Num(); j++)
+						{
+							if (Slot.Items.IsValidIndex(j) && PlayerInventory->GetItemInstance(Slot.Items[j]))
+							{
+								LOG("[" << i << "] ItemDefinition: " << PlayerInventory->GetItemInstance(Slot.Items[j])->GetItemDefinitionBP()->GetName());
+							}
+							else
+							{
+								LOG("[" << i << "] AvaibleSlot");
+							}
+						}
+					}
+				}
+			}
+
+			if (GetAsyncKeyState(VK_F1) & 0x1)
+			{
+				auto World = Globals::FortEngine->GameViewport->World;
+				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
+
+				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+
+				//UFortWeaponRangedItemDefinition* ItemDefinition = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Consumables/Bandage/Athena_Bandage.Athena_Bandage");
+				//UFortAmmoItemDefinition* ItemDefinition = FindObjectFast<UFortAmmoItemDefinition>("/Game/Athena/Items/Ammo/AthenaAmmoDataBulletsMedium.AthenaAmmoDataBulletsMedium");
+
+				UFortTrapItemDefinition* ItemDefinition1 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Ceiling_Electric_Single_Athena_R_T03.TID_Ceiling_Electric_Single_Athena_R_T03");
+				UFortTrapItemDefinition* ItemDefinition2 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Floor_Player_Jump_Pad_Athena.TID_Floor_Player_Jump_Pad_Athena");
+				UFortTrapItemDefinition* ItemDefinition3 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Floor_Player_Jump_Pad_Free_Direction_Athena.TID_Floor_Player_Jump_Pad_Free_Direction_Athena");
+				UFortTrapItemDefinition* ItemDefinition4 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Floor_Spikes_Athena_R_T03.TID_Floor_Spikes_Athena_R_T03");
+				UFortTrapItemDefinition* ItemDefinition5 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Wall_Electric_Athena_R_T03.TID_Wall_Electric_Athena_R_T03");
+
+				if (Pawn && PlayerInventory)
+				{
+					FFortItemEntry ItemEntry;
+					ItemEntry.Count = 1;
+
+					PlayerInventory->SpawnItem(ItemDefinition1, ItemEntry, Pawn->K2_GetActorLocation());
+					PlayerInventory->SpawnItem(ItemDefinition2, ItemEntry, Pawn->K2_GetActorLocation());
+					PlayerInventory->SpawnItem(ItemDefinition3, ItemEntry, Pawn->K2_GetActorLocation());
+					PlayerInventory->SpawnItem(ItemDefinition4, ItemEntry, Pawn->K2_GetActorLocation());
+					PlayerInventory->SpawnItem(ItemDefinition5, ItemEntry, Pawn->K2_GetActorLocation());
+				}
+			}
+#endif // CHEAT
+		}
+
+		if (bLogs)
+		{
+			if (!FuncName.contains("Tick") &&
+				!FuncName.contains("Visual") &&
+				!FuncName.contains("Clown Spinner") &&
+				!FuncName.contains("CustomStateChanged") &&
+				!FuncName.contains("ReceiveBeginPlay") &&
+				!FuncName.contains("OnAttachToBuilding") &&
+				!FuncName.contains("OnWorldReady") &&
+				!FuncName.contains("K2_GetActorLocation") &&
+				!FuncName.contains("ReceiveDrawHUD") &&
+				!FuncName.contains("ServerUpdateCamera") &&
+				!FuncName.contains("ServerMove") &&
+				!FuncName.contains("ContrailCheck") &&
+				!FuncName.contains("GetViewTarget") &&
+				!FuncName.contains("GetAllActorsOfClass") &&
+				!FuncName.contains("ClientAckGoodMove") &&
+				!FuncName.contains("ReadyToEndMatch") &&
+				!FuncName.contains("Check Closest Point") &&
+				!FuncName.contains("ServerTriggerCombatEvent") &&
+				!FuncName.contains("UpdateTime") &&
+				!FuncName.contains("OnUpdateMusic") &&
+				!FuncName.contains("UpdateStateEvent") &&
+				!FuncName.contains("ServerTouchActiveTime") &&
+				!FuncName.contains("OnCheckIfSurrounded") &&
+				!FuncName.contains("ServerFireAIDirectorEventBatch") &&
+				!FuncName.contains("ServerTriggerCombatEventBatch") &&
+				!FuncName.contains("UserConstructionScript") &&
+				!FuncName.contains("K2_OnReset") &&
+				!FuncName.contains("K2_OnEndViewTarget") &&
+				!FuncName.contains("K2_OnBecomeViewTarget") &&
+				!FuncName.contains("ReceiveUnpossessed") &&
+				!FuncName.contains("ClientGotoState") &&
+				!FuncName.contains("K2_OnEndViewTarget") &&
+				!FuncName.contains("K2_OnBecomeViewTarget") &&
+				!FuncName.contains("ClientSetViewTarget") &&
+				!FuncName.contains("ServerClientPawnLoaded") &&
+				!FuncName.contains("ReceiveEndPlay") &&
+				!FuncName.contains("OnPerceptionStimuliSourceEndPlay") &&
+				!FuncName.contains("HandleOnHUDElementVisibilityChanged") &&
+				!FuncName.contains("OnHUDElementVisibilityChanged") &&
+				!FuncName.contains("HandleInteractionChanged") &&
+				!FuncName.contains("BlueprintModifyCamera") &&
+				!FuncName.contains("BlueprintModifyPostProcess") &&
+				!FuncName.contains("ServerSetSpectatorLocation") &&
+				!FuncName.contains("ServerFireAIDirectorEvent") &&
+				!FuncName.contains("ServerTryActivateAbility") &&
+				!FuncName.contains("ClientActivateAbilitySucceed") &&
+				!FuncName.contains("K2_CommitExecute") &&
+				!FuncName.contains("ServerSetSpectatorLocation") &&
+				!FuncName.contains("CanJumpInternal") &&
+				!FuncName.contains("K2_OnMovementModeChanged") &&
+				!FuncName.contains("OnJumped") &&
+				!FuncName.contains("ServerModifyStat") &&
+				!FuncName.contains("OnLanded") &&
+				!FuncName.contains("ReceiveHit") &&
+				!FuncName.contains("K2_OnEndAbility") &&
+				!FuncName.contains("OnWalkingOffLedge") &&
+				!FuncName.contains("ServerEndAbility") &&
+				!FuncName.contains("Execute") &&
+				!FuncName.contains("NetMulticast_InvokeGameplayCueExecuted_FromSpec") &&
+				!FuncName.contains("GameplayCue_Damage") &&
+				!FuncName.contains("OnDamagePlayEffects") &&
+				!FuncName.contains("OnMontageStarted") &&
+				!FuncName.contains("OnNewDamageNumber") &&
+				!FuncName.contains("BP_GetTokenizedDescriptionText") &&
+				!FuncName.contains("NetMulticast_InvokeGameplayCueExecuted_WithParams") &&
+				!FuncName.contains("GameplayCue_InstantDeath") &&
+				!FuncName.contains("K2_GetActorRotation") &&
+				!FuncName.contains("K2_DestroyActor") &&
+				!FuncName.contains("OnDetachFromBuilding") &&
+				!FuncName.contains("OnRep_bAlreadySearched") &&
+				!FuncName.contains("OnSetSearched") &&
+				!FuncName.contains("GetAircraft") &&
+				!FuncName.contains("BeginSpawningActorFromClass") &&
+				!FuncName.contains("BlueprintInitializeAnimation") &&
+				!FuncName.contains("BlueprintUpdateAnimation") &&
+				!FuncName.contains("BlueprintPostEvaluateAnimation") &&
+				!FuncName.contains("FinishSpawningActor") &&
+				!FuncName.contains("PawnUniqueIDSet") &&
+				!FuncName.contains("OnRep_Owner") &&
+				!FuncName.contains("OnRep_Pawn") &&
+				!FuncName.contains("Possess") &&
+				!FuncName.contains("ReceivePossessed") &&
+				!FuncName.contains("ClientRestart") &&
+				!FuncName.contains("SetControlRotation") &&
+				!FuncName.contains("ClientRetryClientRestart") &&
+				!FuncName.contains("ExecuteUbergraph_PlayerPawn_Athena_Generic") &&
+				!FuncName.contains("ExecuteUbergraph_PlayerPawn_Athena") &&
+				!FuncName.contains("ServerAcknowledgePossession") &&
+				!FuncName.contains("IsInAircraft") &&
+				!FuncName.contains("FindPlayerStart") &&
+				!FuncName.contains("SpawnDefaultPawnFor") &&
+				!FuncName.contains("MustSpectate") &&
+				!FuncName.contains("GetDefaultPawnClassForController") &&
+				!FuncName.contains("On Game Phase Change") &&
+				!FuncName.contains("ClientAdjustPosition") &&
+				!FuncName.contains("Movement Audio Crossfader__UpdateFunc") &&
+				!FuncName.contains("Holding Audio Crossfader__UpdateFunc") &&
+				!FuncName.contains("OnUpdateDirectionalLightForTimeOfDay") &&
+				!FuncName.contains("OnMontageEnded") &&
+				!FuncName.contains("ServerCancelAbility") &&
+				!FuncName.contains("K2_ActivateAbility") &&
+				!FuncName.contains("ServerHandleMissionEvent_ToggledCursorMode") &&
+				!FuncName.contains("OnBlendOut_") &&
+				!FuncName.contains("ClientEndAbility") &&
+				!FuncName.contains("OnSafeZoneStateChange") &&
+				!FuncName.contains("ClientVeryShortAdjustPosition") &&
+				!FuncName.contains("OnDayPhaseChange") &&
+				!FuncName.contains("On Day Phase Change") &&
+				!FuncName.contains("K2_OnStartCrouch") &&
+				!FuncName.contains("K2_OnEndCrouch") &&
+				!FuncName.contains("On Player Won") &&
+				!FuncName.contains("ClientFinishedInteractionInZone") &&
+				!FuncName.contains("ClientReceiveKillNotification") &&
+				!FuncName.contains("ReceiveCopyProperties") &&
+				!FuncName.contains("K2_OnLogout") &&
+				!FuncName.contains("ClientReceiveLocalizedMessage") &&
+				!FuncName.contains("ClientCancelAbility") &&
+				!FuncName.contains("ServerFinishedInteractionInZoneReport") &&
+				!FuncName.contains("FallingTimeline__UpdateFunc") &&
+				!FuncName.contains("BndEvt__InterceptCollision_K2Node_ComponentBoundEvent_5_ComponentBeginOverlapSignature__DelegateSignature") &&
+				!FuncName.contains("ReceiveActorBeginOverlap") &&
+				!FuncName.contains("Conv_StringToName") &&
+				!FuncName.contains("OnRep_GamePhase") &&
+				!FuncName.contains("K2_OnSetMatchState") &&
+				!FuncName.contains("StartPlay") &&
+				!FuncName.contains("StartMatch") &&
+				!FuncName.contains("OnAircraftEnteredDropZone") &&
+				!FuncName.contains("ServerShortTimeout") &&
+				!FuncName.contains("UpdateStateWidgetContent") &&
+				!FuncName.contains("PreConstruct") &&
+				!FuncName.contains("Construct") &&
+				!FuncName.contains("OnCurrentTextStyleChanged") &&
+				!FuncName.contains("UpdateButtonState") &&
+				!FuncName.contains("OnBangStateChanged") &&
+				!FuncName.contains("OnPlayerInfoChanged") &&
+				!FuncName.contains("Update") &&
+				!FuncName.contains("OnBeginIntro") &&
+				!FuncName.contains("HandleQuickBarChangedBP") &&
+				!FuncName.contains("HandleInventoryUpdatedEvent") &&
+				!FuncName.contains("OnActivated") &&
+				!FuncName.contains("OnBeginOutro") &&
+				!FuncName.contains("HandleActiveWidgetDeactivated") &&
+				!FuncName.contains("OnDeactivated") &&
+				!FuncName.contains("OnStateStarted") &&
+				!FuncName.contains("SetRenderTransform") &&
+				!FuncName.contains("OnAnimationFinished") &&
+				!FuncName.contains("ReadyToStartMatch") &&
+				!FuncName.contains("SetWidthOverride") &&
+				!FuncName.contains("SetHeightOverride") &&
+				!FuncName.contains("HandleMinimizeFinished") &&
+				!FuncName.contains("ServerUpdateLevelVisibility") &&
+				!FuncName.contains("OnDayPhaseChanged") &&
+				!FuncName.contains("ServerLoadingScreenDropped") &&
+				!FuncName.contains("On Game Phase Step Changed") &&
+				!FuncName.contains("HandleGamePhaseStepChanged") &&
+				!FuncName.contains("GamePhaseStepChanged") &&
+				!FuncName.contains("SetColorAndOpacity") &&
+				!FuncName.contains("OnAnimationStarted") &&
+				!FuncName.contains("UpdateMessaging") &&
+				!FuncName.contains("ServerSendLoadoutConfig") &&
+				!FuncName.contains("CalculateBaseMagnitude") &&
+				!FuncName.contains("ClientRegisterWithParty") &&
+				!FuncName.contains("InitializeHUDForPlayer") &&
+				!FuncName.contains("ClientSetHUD") &&
+				!FuncName.contains("ClientEnableNetworkVoice") &&
+				!FuncName.contains("ClientUpdateMultipleLevelsStreamingStatus") &&
+				!FuncName.contains("ClientFlushLevelStreaming") &&
+				!FuncName.contains("ClientOnGenericPlayerInitialization") &&
+				!FuncName.contains("ClientCapBandwidth") &&
+				!FuncName.contains("K2_PostLogin") &&
+				!FuncName.contains("OnRep_bHasStartedPlaying") &&
+				!FuncName.contains("ServerChoosePart") &&
+				!FuncName.contains("SetOwner") &&
+				!FuncName.contains("OnRep_QuickBar") &&
+				!FuncName.contains("HandleStartingNewPlayer") &&
+				!FuncName.contains("ServerUpdateMultipleLevelsVisibility") &&
+				!FuncName.contains("ServerSetPartyOwner") &&
+				!FuncName.contains("PlayerCanRestart") &&
+				!FuncName.contains("ServerCreateCombatManager") &&
+				!FuncName.contains("ServerCreateAIDirectorDataManager") &&
+				!FuncName.contains("EnableSlot") &&
+				!FuncName.contains("DisableSlot") &&
+				!FuncName.contains("ServerSetShowHeroBackpack") &&
+				!FuncName.contains("ServerSetShowHeroHeadAccessories") &&
+				!FuncName.contains("ServerSetClientHasFinishedLoading") &&
+				!FuncName.contains("ServerReadyToStartMatch") &&
+				!FuncName.contains("Received_Notify") &&
+				!FuncName.contains("Received_NotifyBegin") &&
+				!FuncName.contains("AnimNotify_LeftFootStep") &&
+				!FuncName.contains("AnimNotify_RightFootStep") &&
+				!FuncName.contains("Completed_") &&
+				!FuncName.contains("InputActionHoldStopped") &&
+				!FuncName.contains("ServerCurrentMontageSetPlayRate") &&
+				!FuncName.contains("AnimNotify_PlayFireFX") &&
+				!FuncName.contains("ServerSetReplicatedTargetData") &&
+				!FuncName.contains("Triggered_") &&
+				!FuncName.contains("ActorHasTag") &&
+				!FuncName.contains("RandomIntegerInRange") &&
+				!FuncName.contains("ClientReportDamagedResourceBuilding") &&
+				!FuncName.contains("GetItemDefinitionBP") &&
+				!FuncName.contains("CreateTemporaryItemInstanceBP") &&
+				!FuncName.contains("SetOwningControllerForTemporaryItem") &&
+				!FuncName.contains("OnRep_PrimaryQuickBar") &&
+				!FuncName.contains("OnRep_SecondaryQuickBar") &&
+				!FuncName.contains("ServerSetupWeakSpotsOnBuildingActor") &&
+				!FuncName.contains("OnStartDirectionEffect") &&
+				!FuncName.contains("NetMulticast_Athena_BatchedDamageCues") &&
+				!FuncName.contains("SetReplicates") &&
+				!FuncName.contains("ServerCurrentMontageSetNextSectionName") &&
+				!FuncName.contains("NetFadeOut") &&
+				!FuncName.contains("OnFadeOut") &&
+				!FuncName.contains("NetOnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("NetMulticast_InvokeGameplayCueAdded_WithParams") &&
+				!FuncName.contains("GameplayCue") &&
+				!FuncName.contains("ReceiveActorEndOverlap") &&
+				!FuncName.contains("PhysicsVolumeChanged") &&
+				!FuncName.contains("ServerAddItemInternal") &&
+				!FuncName.contains("FortClientPlaySound") &&
+				!FuncName.contains("OnCapsuleBeginOverlap") &&
+				!FuncName.contains("GetPlayerController") &&
+				!FuncName.contains("TossPickup") &&
+				!FuncName.contains("OnRep_PrimaryPickupItemEntry") &&
+				!FuncName.contains("ServerActivateSlotInternal") &&
+				!FuncName.contains("EquipWeaponDefinition") &&
+				!FuncName.contains("OnInitAlteration") &&
+				!FuncName.contains("OnInitCosmeticAlterations") &&
+				!FuncName.contains("ClientGivenTo") &&
+				!FuncName.contains("K2_OnUnEquip") &&
+				!FuncName.contains("OnWeaponVisibilityChanged") &&
+				!FuncName.contains("OnWeaponAttached") &&
+				!FuncName.contains("ClientInternalEquipWeapon") &&
+				!FuncName.contains("GetItemGuid") &&
+				!FuncName.contains("InternalServerSetTargeting") &&
+				!FuncName.contains("ServerReleaseInventoryItemKey") &&
+				!FuncName.contains("OnPawnMontageBlendingOut") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("OnHitCrack") &&
+				!FuncName.contains("EvaluateGraphExposedInputs_ExecuteUbergraph_Fortnite_M_Avg_Player_AnimBlueprint_AnimGraphNode_"))
+			{
+				LOG("FuncName: " << FuncName);
+			}
+		}
 
 		if (FuncName.contains("ReadyToStartMatch"))
 		{
@@ -62,280 +453,92 @@ namespace Hooks
 				Globals::FortEngine = UObject::FindObject<UFortEngine>("FortEngine_");
 				Globals::World = Globals::FortEngine->GameViewport->World;
 				Globals::PC = reinterpret_cast<AFortPlayerController*>(Globals::FortEngine->GameInstance->LocalPlayers[0]->PlayerController);
-
 				auto BaseAddr = Util::BaseAddress();
-
-				MH_CreateHook((LPVOID)(BaseAddr + 0x249c7c0), ReturnDedicatedServer, nullptr);
-				MH_EnableHook((LPVOID)(BaseAddr + 0x249c7c0));
-				MH_CreateHook((LPVOID)(BaseAddr + 0x1ecbf80), ReturnDedicatedServer, nullptr);
-				MH_EnableHook((LPVOID)(BaseAddr + 0x1ecbf80));
-
-				SetGIsClient(false);
-				SetGIsServer(true);
 
 				Beacons::InitHooks(); // Sets up the beacon and inits replication for use!
 
 				bHasInitedTheBeacon = true;
-				Globals::World->AuthorityGameMode->GameSession->MaxPlayers = 100;
 
-				((AGameMode*)Globals::World->AuthorityGameMode)->StartMatch();
+				AFortGameModeAthena* GameMode = (AFortGameModeAthena*)Globals::World->AuthorityGameMode;
+				AAthena_GameState_C* GameState = (AAthena_GameState_C*)Globals::World->GameState;
+
+				LOG("World: " << Globals::World->GetName());
+
+				if (Globals::World->GetName().contains("Athena_Faceoff") && GameState)
+				{
+					EAthenaGamePhase OldGamePhase = GameState->GamePhase;
+
+					LOG("OldGamePhase: " << (int&)OldGamePhase);
+
+					GameState->GamePhase = EAthenaGamePhase::None;
+					GameState->OnRep_GamePhase(OldGamePhase);
+
+					MH_CreateHook((LPVOID)(BaseAddr + 0x3FFB60), sub_7FF66CA1FB60Hook, nullptr);
+					MH_EnableHook((LPVOID)(BaseAddr + 0x3FFB60));
+				}
+
+				if (GameMode)
+				{
+					GameMode->GameSession->MaxPlayers = 100;
+					GameMode->StartMatch();
+				}
 
 				Globals::PC->CheatManager->DestroyAll(APlayerController::StaticClass());
+
+				MH_CreateHook((LPVOID)(BaseAddr + 0x249c7c0), GetNetModeHook, nullptr);
+				MH_EnableHook((LPVOID)(BaseAddr + 0x249c7c0));
+				MH_CreateHook((LPVOID)(BaseAddr + 0x1ecbf80), InternalGetNetModeHook, nullptr);
+				MH_EnableHook((LPVOID)(BaseAddr + 0x1ecbf80));
+
+				//*(bool*)GIsClient() = false; // crashes with the EquipWeaponDefinition function
+				//*(bool*)GIsServer() = true;
 
 				StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Abilities/Player/Constructor/Perks/ContainmentUnit/GE_Constructor_ContainmentUnit_Applied.GE_Constructor_ContainmentUnit_Applied_C");
 			}
 		}
 
-		if (FuncName.find("AircraftExitedDropZone") != std::string::npos)
+		if (FuncName.contains("HandleStartingNewPlayer") && bHasInitedTheBeacon)
 		{
-			for (int i = 0; i < Globals::World->NetDriver->ClientConnections.Num(); i++)
+			auto Parameters = (AGameModeBase_HandleStartingNewPlayer_Params*)Parms;
+			UWorld* World = Globals::World;
+
+			if (World)
 			{
-				auto Connection = Globals::World->NetDriver->ClientConnections[i];
+				AFortPlayerController* PlayerController = (AFortPlayerController*)Parameters->NewPlayer;
 
-				if (Connection && Connection->PlayerController)
+				if (PlayerController)
 				{
-					auto FortPlayerController = (AFortPlayerControllerAthena*)(Connection->PlayerController);
+					AGameModeBase* GameMode = World->AuthorityGameMode;
+					AController* Player = Parameters->NewPlayer;
 
-					if (FortPlayerController->IsInAircraft())
+					if (GameMode && Player)
 					{
-						FortPlayerController->ServerAttemptAircraftJump({});
-					}
-				}
-			}
-		}
+						AActor* PlayerStart = GameMode->ChoosePlayerStart(Player);
 
-
-		if (FuncName.contains("ServerTryActivateAbility"))
-		{
-			auto Params = (UAbilitySystemComponent_ServerTryActivateAbility_Params*)Parms;
-			auto AbilitySystemComp = (UAbilitySystemComponent*)Object;
-
-			auto AbilityToActivate = Params->AbilityToActivate;
-			auto PredictionKey = Params->PredictionKey;
-
-			UGameplayAbility* InstancedAbility = nullptr;
-
-			if (!InternalTryActivateAbilityLong(AbilitySystemComp, AbilityToActivate, PredictionKey, &InstancedAbility, nullptr, nullptr))
-			{
-				AbilitySystemComp->ClientActivateAbilityFailed(AbilityToActivate, PredictionKey.Base);
-			}
-
-			return NULL;
-		}
-		
-		if (FuncName.contains("ServerExecuteInventoryItem"))
-		{
-			auto PC = (AFortPlayerControllerAthena*)Object;
-			auto Params = (AFortPlayerController_ServerExecuteInventoryItem_Params*)Parms;
-
-			if (PC->IsInAircraft())
-				return ProcessEvent(Object, Function, Parms);
-
-			if (PC)
-			{
-				auto Inv = FindInventory(PC);
-				if (Inv)
-				{
-					Inv->ExecuteInventoryItem(Params->ItemGuid);
-				}
-			}
-		}
-
-		if (FuncName.contains("ServerReturnToMainMenu"))
-		{
-			auto PC = (AFortPlayerController*)Object;
-			PC->ClientTravel(L"/Game/Maps/Frontend", ETravelType::TRAVEL_Absolute, false, FGuid());
-		}
-
-		if (FuncName.contains("ServerHandlePickup"))
-		{
-			auto Pawn = (AFortPlayerPawn*)Object;
-			auto Params = (AFortPlayerPawn_ServerHandlePickup_Params*)Parms;
-
-			if (Pawn)
-			{
-				auto PC = (AFortPlayerController*)Pawn->Controller;
-				if (PC)
-				{
-					auto WorldInventory = PC->WorldInventory;
-					auto QuickBars = PC->QuickBars;
-					if (WorldInventory)
-					{
-						auto PickupEntry = Params->Pickup->PrimaryPickupItemEntry;
-						auto PickupDef = PickupEntry.ItemDefinition;
-
-						int PickupSlot = -1;
-
-						for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+						if (PlayerStart)
 						{
-							auto ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+							FVector PlayerStartLocation = PlayerStart->K2_GetActorLocation();
+							FRotator PlayerStartRotation = PlayerStart->K2_GetActorRotation();
 
-							if (ItemInstance->GetItemDefinitionBP() == PickupDef && IsPickupStackable(PickupDef))
+							if (!bSetupCharPartArray)
 							{
-								for (int j = 0; j < QuickBars->PrimaryQuickBar.Slots.Num(); j++)
-								{
-									if (!QuickBars->PrimaryQuickBar.Slots[j].Items.IsValidIndex(0))
-										continue;
-
-									if (Util::AreGuidsTheSame(ItemInstance->GetItemGuid(), QuickBars->PrimaryQuickBar.Slots[j].Items[0]))
-									{
-										PickupSlot = j;
-										break;
-									}
-								}
-							}
-						}
-
-						int Count = 0;
-
-						for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
-						{
-							auto ItemInstance = WorldInventory->Inventory.ItemInstances[i];
-
-							if (ItemInstance->GetItemDefinitionBP() == PickupDef && IsPickupStackable(PickupDef))
-							{
-								WorldInventory->Inventory.ItemInstances.Remove(i);
-
-								for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
-								{
-									auto Entry = WorldInventory->Inventory.ReplicatedEntries[j];
-
-									if (Entry.ItemDefinition == PickupDef && IsPickupStackable(PickupDef))
-									{
-										WorldInventory->Inventory.ReplicatedEntries.Remove(j);
-										Count = Entry.Count;
-									}
-								}
-							}
-						}
-
-						auto NewPickupWorldItem = (UFortWorldItem*)PickupDef->CreateTemporaryItemInstanceBP(PickupEntry.Count + Count, 1);
-						NewPickupWorldItem->ItemEntry = PickupEntry;
-						NewPickupWorldItem->ItemEntry.Count = PickupEntry.Count + Count;
-						NewPickupWorldItem->bTemporaryItemOwningController = true;
-						NewPickupWorldItem->SetOwningControllerForTemporaryItem(PC);
-
-						WorldInventory->Inventory.ItemInstances.Add(NewPickupWorldItem);
-						WorldInventory->Inventory.ReplicatedEntries.Add(NewPickupWorldItem->ItemEntry);
-
-						FindInventory((AFortPlayerController*)PC)->UpdateInventory();
-						
-						// find the next available quickbar slot for pickup.
-						if (PickupSlot == -1)
-						{
-							for (int i = 0; i < QuickBars->PrimaryQuickBar.Slots.Num(); i++)
-							{
-								if (!QuickBars->PrimaryQuickBar.Slots[i].Items.IsValidIndex(0))
-								{
-									PickupSlot = i;
-									break;
-								}
-							}
-						}
-
-						int CurrentSlot = QuickBars->PrimaryQuickBar.CurrentFocusedSlot;
-
-						if (PickupSlot != -1)
-							QuickBars->ServerAddItemInternal(NewPickupWorldItem->GetItemGuid(), EFortQuickBars::Primary, PickupSlot);
-
-						QuickBars->PrimaryQuickBar.CurrentFocusedSlot = CurrentSlot;
-					}
-				}
-			}
-		}
-
-		if (FuncName.contains("ServerSpawnInventoryDrop"))
-		{
-			auto PC = (AFortPlayerControllerAthena*)Object;
-			auto Params = (AFortPlayerController_ServerSpawnInventoryDrop_Params*)Parms;
-
-			if (PC->IsInAircraft())
-				return NULL;
-
-			if (PC)
-			{
-				auto WorldInventory = PC->WorldInventory;
-				auto QuickBars = PC->QuickBars;
-				if (WorldInventory)
-				{
-					auto ItemInstances = WorldInventory->Inventory.ItemInstances;
-					for (int i = 0; i < ItemInstances.Num(); i++)
-					{
-						auto ItemInstance = ItemInstances[i];
-						if (Util::AreGuidsTheSame(ItemInstance->GetItemGuid(), Params->ItemGuid))
-						{
-							auto Entry = ItemInstance->ItemEntry;
-							auto ItemDefintion = ItemInstance->GetItemDefinitionBP();
-
-							int Count = 0;
-							int LoadedAmmo = 0;
-
-							if (Params->Count == Entry.Count) //Remove it from the array
-							{
-								ItemInstances.Remove(i);
-
-								for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
-								{
-									auto Entry = WorldInventory->Inventory.ReplicatedEntries[j];
-
-									Count = Entry.Count;
-
-									if (Util::AreGuidsTheSame(Entry.ItemGuid, Params->ItemGuid))
-									{
-										WorldInventory->Inventory.ReplicatedEntries.Remove(j);
-									}
-								}
-							}
-							else {
-								ItemInstances.Remove(i);
-
-								for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
-								{
-									auto Entry = WorldInventory->Inventory.ReplicatedEntries[j];
-
-									Count = Entry.Count;
-
-									if (Util::AreGuidsTheSame(Entry.ItemGuid, Params->ItemGuid))
-									{
-										WorldInventory->Inventory.ReplicatedEntries.Remove(j);
-									}
-								}
-
-								auto NewWorldItem = (UFortWorldItem*)(ItemInstance->GetItemDefinitionBP()->CreateTemporaryItemInstanceBP(Entry.Count - Params->Count, 0));
-								WorldInventory->Inventory.ItemInstances.Add(NewWorldItem);
-								WorldInventory->Inventory.ReplicatedEntries.Add(NewWorldItem->ItemEntry);
-
-								Count = Params->Count;
+								LoadCharacterParts();
+								bSetupCharPartArray = true;
 							}
 
-							/*for (int i = 0; i < QuickBars->PrimaryQuickBar.Slots.Num(); i++)
+							/*if (!bEverythingSearched)
 							{
-								auto Slot = QuickBars->PrimaryQuickBar.Slots[i];
-
-								if (Slot.Items.IsValidIndex(0))
-								{
-									if (Util::AreGuidsTheSame(Slot.Items[0], Params->ItemGuid))
-									{
-										if (i != -1)
-											QuickBars->EmptySlot(EFortQuickBars::Primary, i);
-
-										Slot.Items.Remove(0);
-									}
-								}
+								GPFuncs::MakeEverythingSearched();
+								bEverythingSearched = true;
 							}*/
 
-							LoadedAmmo = ItemInstance->ItemEntry.LoadedAmmo;
+							/*if (!bSetupFloorLoot)
+							{
+								GPFuncs::SpawnFloorLoot();
+								bSetupFloorLoot = true;
+							}*/
 
-							auto NewFortPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), PC->Pawn->K2_GetActorLocation(), FRotator()));
-
-							NewFortPickup->PrimaryPickupItemEntry.Count = Count;
-							NewFortPickup->PrimaryPickupItemEntry.ItemDefinition = ItemDefintion;
-							NewFortPickup->PrimaryPickupItemEntry.LoadedAmmo = LoadedAmmo;
-							NewFortPickup->OnRep_PrimaryPickupItemEntry();
-
-							NewFortPickup->TossPickup(PC->Pawn->K2_GetActorLocation(), nullptr, 1);
-
-							FindInventory(PC)->UpdateInventory();
+							GPFuncs::SpawnPlayer(PlayerController, PlayerStartLocation, PlayerStartRotation);
 						}
 					}
 				}
@@ -344,52 +547,371 @@ namespace Hooks
 
 		if (FuncName.contains("ServerAttemptAircraftJump"))
 		{
-			auto PC = (AFortPlayerControllerAthena*)Object;
+			auto Parameters = (AFortPlayerControllerAthena_ServerAttemptAircraftJump_Params*)Parms;
 
-			auto NewPawn = (APlayerPawn_Athena_C*)(Util::SpawnActor(APlayerPawn_Athena_C::StaticClass(), ((AFortGameStateAthena*)Globals::World->GameState)->GetAircraft()->K2_GetActorLocation(), {}));
-			if (NewPawn) {
-				PC->Possess(NewPawn);
-				auto HealthSet = NewPawn->HealthSet;
-				HealthSet->CurrentShield.Minimum = 0;
-				HealthSet->CurrentShield.Maximum = 100;
-				HealthSet->CurrentShield.BaseValue = 0;
-				HealthSet->Shield.Minimum = 0;
-				HealthSet->Shield.Maximum = 100;
-				HealthSet->Shield.BaseValue = 100;
-				HealthSet->OnRep_Shield();
-				HealthSet->OnRep_CurrentShield();
+			auto PlayerController = (AFortPlayerControllerAthena*)Object;
+			UWorld* World = Globals::World;
+			AFortGameModeAthena* GameMode = (AFortGameModeAthena*)World->AuthorityGameMode;
+			AFortGameStateAthena* GameState = (AFortGameStateAthena*)World->GameState;
 
-				NewPawn->HealthRegenDelayGameplayEffect = nullptr;
-				NewPawn->ShieldRegenDelayGameplayEffect = nullptr;
-				NewPawn->ShieldRegenGameplayEffect = nullptr;
-				NewPawn->HealthRegenGameplayEffect = nullptr;
+			if (PlayerController && World && GameMode && GameState)
+			{
+				if (PlayerController->IsInAircraft() && !PlayerController->Pawn)
+				{
+					AFortAthenaAircraft* Aircraft = GameState->GetAircraft();
 
-				PC->SetControlRotation(((AFortPlayerControllerAthena_ServerAttemptAircraftJump_Params*)Parms)->ClientRotation);
+					if (Aircraft)
+					{
+						FVector AircraftLocation = Aircraft->K2_GetActorLocation();
+						FRotator ClientRotation = Parameters->ClientRotation;
 
-				FindInventory(PC)->UpdateInventory();
+						GPFuncs::SpawnPlayer(PlayerController, AircraftLocation, {}, false);
+						PlayerController->SetControlRotation(ClientRotation);
+
+						Inventory* PlayerInventory = FindInventory(PlayerController);
+
+						if (PlayerInventory)
+						{
+							UFortWorldItem* ItemInstance = PlayerInventory->GetItemSlot(0, EFortQuickBars::Primary);
+
+							if (ItemInstance) {
+								PlayerController->ServerExecuteInventoryItem(ItemInstance->GetItemGuid());
+							}
+
+							PlayerInventory->RemoveAllItemsFromInventory();
+							PlayerInventory->UpdateInventory();
+						}
+					}
+				}
 			}
 		}
 
+		if (FuncName.contains("AircraftExitedDropZone"))
+		{
+			UWorld* World = Globals::World;
+
+			if (World && World->NetDriver)
+			{
+				for (int i = 0; i < World->NetDriver->ClientConnections.Num(); i++)
+				{
+					auto ClientConnection = World->NetDriver->ClientConnections[i];
+
+					if (ClientConnection)
+					{
+						auto PlayerController = (AFortPlayerControllerAthena*)ClientConnection->PlayerController;
+						if (!PlayerController) continue;
+						if (PlayerController->Pawn) continue;
+						if (!PlayerController->IsInAircraft()) continue;
+
+						PlayerController->ServerAttemptAircraftJump({});
+					}
+				}
+			}
+		}
+
+		if (FuncName.contains("ServerTryActivateAbility"))
+		{
+			auto Parameters = (UAbilitySystemComponent_ServerTryActivateAbility_Params*)Parms;
+			auto AbilitySystemComponent = (UAbilitySystemComponent*)Object;
+
+			if (AbilitySystemComponent)
+			{
+				FGameplayAbilitySpecHandle& AbilityToActivate = Parameters->AbilityToActivate;
+				FPredictionKey& PredictionKey = Parameters->PredictionKey;
+
+				Abilities::InternalServerTryActiveAbility(AbilitySystemComponent, AbilityToActivate, Parameters->InputPressed, PredictionKey, nullptr);
+			}
+		}
+		
 		if (FuncName.contains("ServerAbilityRPCBatch"))
 		{
-			auto AbilityComp = (UAbilitySystemComponent*)Object;
-			auto CurrentParams = (UAbilitySystemComponent_ServerAbilityRPCBatch_Params*)Parms;
+			auto Parameters = (UAbilitySystemComponent_ServerAbilityRPCBatch_Params*)Parms;
+			auto AbilitySystemComponent = (UAbilitySystemComponent*)Object;
 
-			UGameplayAbility* InstancedAbility = nullptr;
-			if (!InternalTryActivateAbilityLong(AbilityComp, CurrentParams->BatchInfo.AbilitySpecHandle, CurrentParams->BatchInfo.PredictionKey, &InstancedAbility, nullptr, nullptr))
+			if (AbilitySystemComponent)
 			{
-				AbilityComp->ClientActivateAbilityFailed(CurrentParams->BatchInfo.AbilitySpecHandle, CurrentParams->BatchInfo.PredictionKey.Base);
+				auto BatchInfo = Parameters->BatchInfo;
+
+				FGameplayAbilitySpecHandle& AbilityToActivate = BatchInfo.AbilitySpecHandle;
+				FPredictionKey& PredictionKey = BatchInfo.PredictionKey;
+
+				Abilities::InternalServerTryActiveAbility(AbilitySystemComponent, AbilityToActivate, BatchInfo.InputPressed, PredictionKey, nullptr);
+			}
+		}
+		
+		if (FuncName.contains("ServerExecuteInventoryItem"))
+		{
+			auto Params = (AFortPlayerController_ServerExecuteInventoryItem_Params*)Parms;
+			auto PlayerController = (AFortPlayerControllerAthena*)Object;
+
+			if (PlayerController)
+			{
+				if (PlayerController->IsInAircraft())
+					return ProcessEvent(Object, Function, Parms);
+
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+				AFortPlayerPawn* Pawn = (AFortPlayerPawn*)PlayerController->Pawn;
+
+				if (PlayerInventory && Pawn)
+				{
+					UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(Params->ItemGuid);
+
+					if (ItemInstance)
+					{
+						UFortItemDefinition* ItemDefinition = ItemInstance->GetItemDefinitionBP();
+						FFortItemEntry ItemEntry = ItemInstance->ItemEntry;
+
+						if (ItemDefinition)
+						{
+							AFortWeapon* Weapon = Pawn->EquipWeaponDefinition((UFortWeaponItemDefinition*)ItemDefinition, ItemInstance->GetItemGuid());
+
+							if (Weapon && Weapon->IsA(AFortWeap_BuildingTool::StaticClass())) // From Reboot
+							{
+								AFortWeap_BuildingTool* BuildingTool = (AFortWeap_BuildingTool*)Weapon;
+
+								if (BuildingTool)
+								{
+									static auto RoofPiece = FindObjectFast<UFortBuildingItemDefinition>("/Game/Items/Weapons/BuildingTools/BuildingItemData_RoofS.BuildingItemData_RoofS");
+									static auto FloorPiece = FindObjectFast<UFortBuildingItemDefinition>("/Game/Items/Weapons/BuildingTools/BuildingItemData_Floor.BuildingItemData_Floor");
+									static auto WallPiece = FindObjectFast<UFortBuildingItemDefinition>("/Game/Items/Weapons/BuildingTools/BuildingItemData_Wall.BuildingItemData_Wall");
+									static auto StairPiece = FindObjectFast<UFortBuildingItemDefinition>("/Game/Items/Weapons/BuildingTools/BuildingItemData_Stair_W.BuildingItemData_Stair_W");
+
+									if (ItemDefinition == RoofPiece)
+									{
+										static auto RoofMetadata = FindObjectFast<UBuildingEditModeMetadata>("/Game/Building/EditModePatterns/Roof/EMP_Roof_RoofC.EMP_Roof_RoofC");
+										BuildingTool->DefaultMetadata = RoofMetadata;
+									}
+									else if (ItemDefinition == StairPiece)
+									{
+										static auto StairMetadata = FindObjectFast<UBuildingEditModeMetadata>("/Game/Building/EditModePatterns/Stair/EMP_Stair_StairW.EMP_Stair_StairW");
+										BuildingTool->DefaultMetadata = StairMetadata;
+									}
+									else if (ItemDefinition == WallPiece)
+									{
+										static auto WallMetadata = FindObjectFast<UBuildingEditModeMetadata>("/Game/Building/EditModePatterns/Wall/EMP_Wall_Solid.EMP_Wall_Solid");
+										BuildingTool->DefaultMetadata = WallMetadata;
+									}
+									else if (ItemDefinition == FloorPiece)
+									{
+										static auto FloorMetadata = FindObjectFast<UBuildingEditModeMetadata>("/Game/Building/EditModePatterns/Floor/EMP_Floor_Floor.EMP_Floor_Floor");
+										BuildingTool->DefaultMetadata = FloorMetadata;
+									}
+
+									BuildingTool->OnRep_DefaultMetadata();
+								}
+							}
+							else if (ItemDefinition->IsA(UFortDecoItemDefinition::StaticClass()))
+							{
+								UFortDecoItemDefinition* DecoItemDefinition = (UFortDecoItemDefinition*)ItemDefinition;
+
+								Pawn->PickUpActor(nullptr, DecoItemDefinition);
+								Pawn->CurrentWeapon->ItemEntryGuid = ItemInstance->GetItemGuid();
+							}
+						}
+					}
+				}
 			}
 		}
 
-		if (FuncName.contains("ServerLoadingScreenDropped"))
+		if (FuncName.contains("OnTriggerTouch"))
 		{
-			auto PC = (AFortPlayerController*)Object;
-			auto Pawn = (APlayerPawn_Athena_C*)PC->Pawn;
-			if (!Pawn)
-				return NULL;
+			auto Params = (ABuildingTrap_OnTriggerTouch_Params*)Parms;
+			auto Trap = (ABuildingTrap*)Object;
+			
+			if (Trap)
+			{
+				AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Trap->GetOwningController();
 
-			GPFuncs::GrantGameplayAbilities(Pawn);
+				if (PlayerController)
+				{
+					AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
+
+					if (Pawn) // idk
+					{
+						/*void OnBumpPushedPawn(class AFortPawn* InstigatedBy, float PushTimeLeft);
+						void LaunchCharacterJump(const struct FVector& LaunchVelocity, bool bXYOverride, bool bZOverride, bool bIgnoreFallDamage, bool bPlayFeedbackEvent);
+						void ApplyKnockback(float KnockbackMagnitude, float KnockbackZAngle, const struct FVector& ImpulseDir);*/
+					}
+				}
+			}
+		}
+
+		if (FuncName.contains("ClientOnPawnDied"))
+		{
+			auto Params = (AFortPlayerControllerZone_ClientOnPawnDied_Params*)Parms;
+			auto PlayerController = (AFortPlayerControllerZone*)Object;
+
+			LOG("ClientOnPawnDied");
+
+			if (PlayerController && PlayerController->Pawn)
+			{
+				FFortPlayerDeathReport DeathReport = Params->DeathReport;
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+
+				ABP_VictoryDrone_C* VictoryDrone = (ABP_VictoryDrone_C*)(Util::SpawnActor(ABP_VictoryDrone_C::StaticClass(), PlayerController->Pawn->K2_GetActorLocation(), {}));
+
+				VictoryDrone->PlaySpawnOutAnim();
+
+				if (PlayerInventory)
+				{
+					PlayerInventory->DropAllItemsFromInventory();
+					Inventory::InventoryMap.erase(PlayerController);
+				}
+			}
+		}
+
+		if (FuncName.contains("OnCapsuleBeginOverlap"))
+		{
+			auto Params = (AFortPlayerPawnAthena_OnCapsuleBeginOverlap_Params*)Parms;
+			auto Pawn = (AFortPlayerPawnAthena*)Object;
+
+#ifdef AUTO_PICKUP
+			if (Pawn)
+			{
+				auto PlayerController = (AFortPlayerControllerAthena*)Pawn->Controller;
+
+				if (PlayerController && Params->OtherActor->IsA(AFortPickupAthena::StaticClass()))
+				{
+					AFortPickupAthena* Pickup = (AFortPickupAthena*)Params->OtherActor;
+
+					if (Pickup)
+					{
+						UFortItemDefinition* ItemDefinition = Pickup->PrimaryPickupItemEntry.ItemDefinition;
+
+						if (ItemDefinition)
+						{
+							if (ItemDefinition->IsA(UFortAmmoItemDefinition::StaticClass()) ||
+								ItemDefinition->IsA(UFortTrapItemDefinition::StaticClass()) ||
+								ItemDefinition->IsA(UFortResourceItemDefinition::StaticClass()))
+							{
+								float FlyTime = Globals::MathLib->STATIC_RandomFloatInRange(1.40f, 1.46f);
+
+								Pawn->ServerHandlePickup((AFortPickupAthena*)Params->OtherActor, FlyTime, FVector(), true);
+							}
+						}
+					}
+				}
+			}
+#endif
+		}
+
+		if (FuncName.contains("ServerHandlePickup"))
+		{
+			auto Params = (AFortPlayerPawn_ServerHandlePickup_Params*)Parms;
+			AFortPlayerPawn* Pawn = (AFortPlayerPawn*)Object;
+			AFortPickup* Pickup = Params->Pickup;
+
+			if (Pickup)
+			{
+				if (!Pawn || Pickup->bPickedUp)
+					return NULL;
+
+				Pawn->IncomingPickups.Add(Pickup);
+
+				FFortPickupLocationData PickupLocationData = Pickup->PickupLocationData;
+
+				PickupLocationData.ItemOwner = Pawn;
+				PickupLocationData.PickupTarget = Pawn;
+				PickupLocationData.FlyTime = Params->InFlyTime;
+				PickupLocationData.StartDirection == Params->InStartDirection;
+				PickupLocationData.PickupGuid = Pickup->PrimaryPickupItemEntry.ItemGuid;
+				Pickup->OnRep_PickupLocationData();
+			}
+		}
+
+		if (FuncName.contains("ServerSpawnInventoryDrop"))
+		{
+			auto Params = (AFortPlayerController_ServerSpawnInventoryDrop_Params*)Parms;
+			auto PlayerController = (AFortPlayerControllerAthena*)Object;
+
+			if (PlayerController)
+			{
+				if (PlayerController->IsInAircraft())
+					return NULL;
+
+				AFortInventory* WorldInventory = PlayerController->WorldInventory;
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+				AFortQuickBars* QuickBars = PlayerController->QuickBars;
+				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
+
+				if (WorldInventory && PlayerInventory && QuickBars && Pawn)
+				{
+					UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(Params->ItemGuid);
+
+					if (ItemInstance)
+					{
+						UFortWorldItemDefinition* ItemDefinition = (UFortWorldItemDefinition*)ItemInstance->GetItemDefinitionBP();
+						FFortItemEntry ItemEntry = ItemInstance->ItemEntry;
+						bool bRemoveItemFromQuickbar = false;
+						int ItemSlot = -1;
+
+						if (ItemDefinition && ItemDefinition->bCanBeDropped)
+						{
+							FGuid ItemGuid = ItemInstance->GetItemGuid();
+							ItemSlot = PlayerInventory->GetItemSlotQuickbar(ItemDefinition, EFortQuickBars::Primary);
+
+							if (ItemEntry.Count == Params->Count)
+							{
+								PlayerInventory->DropItemFromInventory(ItemGuid);
+								PlayerInventory->RemoveItemFromQuickbar(ItemGuid);
+								PlayerInventory->RemoveItemFromInventory(ItemGuid);
+
+								bRemoveItemFromQuickbar = true;
+							}
+							else if (Params->Count < ItemEntry.Count)
+							{
+								PlayerInventory->RemoveItemFromQuickbar(ItemGuid);
+								PlayerInventory->RemoveItemFromInventory(ItemInstance->GetItemGuid());
+
+								ItemEntry.Count = ItemEntry.Count - Params->Count;
+								UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+
+								if (ItemSlot != -1)
+									PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), ItemSlot, EFortQuickBars::Primary);
+
+								ItemEntry.Count = Params->Count;
+								PlayerInventory->SpawnItem(ItemDefinition, ItemEntry, Pawn->K2_GetActorLocation());
+							}
+						}
+
+						if (bRemoveItemFromQuickbar && QuickBars->PrimaryQuickBar.CurrentFocusedSlot == ItemSlot)
+						{
+							UFortWorldItem* PickaxeInstance = PlayerInventory->GetItemSlot(0, EFortQuickBars::Primary);
+
+							if (PickaxeInstance)
+								PlayerController->ServerExecuteInventoryItem(PickaxeInstance->GetItemGuid());
+						}
+					}
+
+					PlayerInventory->UpdateInventory();
+				}
+			}
+		}
+
+		if (FuncName.contains("OnSpawnOutAnimEnded"))
+		{
+			ABP_VictoryDrone_C* VictoryDrone = (ABP_VictoryDrone_C*)Object;
+
+			if (VictoryDrone)
+				VictoryDrone->K2_DestroyActor();
+		}
+
+		if (FuncName.contains("ReceiveDestroyed"))
+		{
+			AActor* Actor = (AActor*)Object;
+
+			if (Actor && bLogs)
+			{
+				LOG("ActorDestroy: " << Actor->GetName());
+			}
+		}
+
+		if (FuncName.contains("OnDeathServer"))
+		{
+			AFortPawn* Pawn = (AFortPawn*)Object;
+
+			if (Pawn)
+				Pawn->K2_DestroyActor();
 		}
 
 		if (FuncName.contains("ServerAttemptInteract"))
@@ -639,23 +1161,7 @@ namespace Hooks
 			return NULL;
 		}
 #endif
-
-		if (FuncName.contains("ClientOnPawnDied"))
-		{
-			auto PC = (AFortPlayerControllerAthena*)Object;
-			auto Pawn = PC->Pawn;
-
-			if (PC && PC->WorldInventory != nullptr)
-			{
-				auto Inv = FindInventory(PC);
-				if (Inv)
-				{
-					Inv->SpawnAllLootInInventory();
-					Inventory::InventoryMap.erase(PC);
-				}
-			}
-		}
-
+	
 		if (FuncName.contains("OnDamageServer"))
 		{
 			if (!Object->IsA(ABuildingSMActor::StaticClass()))
@@ -730,7 +1236,7 @@ namespace Hooks
 
 		if (FuncName.contains("ServerCreateBuildingActor"))
 		{
-			auto params = (AFortPlayerController_ServerCreateBuildingActor_Params*)(Parms);
+			/*auto params = (AFortPlayerController_ServerCreateBuildingActor_Params*)(Parms);
 			auto BuildClass = params->BuildingClassData.BuildingClass;
 			auto Loc = params->BuildLoc;
 			auto Rot = params->BuildRot;
@@ -794,31 +1300,8 @@ namespace Hooks
 				}
 			}
 
-			return NULL;
+			return NULL;*/
 		}
-
-		if (FuncName.contains("ReceiveDestroyed"))
-		{
-			auto Actor = (AActor*)Object;
-
-			if (Globals::World->NetDriver) {
-				for (int i = 0; i < Globals::World->NetDriver->ClientConnections.Num(); i++)
-				{
-					auto Connection = Globals::World->NetDriver->ClientConnections[i];
-
-					if (!Connection) continue;
-
-					auto Channel = Replication::FindChannel(Actor, Connection);
-
-					if (Channel)
-					{
-						Replication::ActorChannelClose(Channel, 0, 0, 0);
-					}
-				}
-			}
-		}
-
-		/////////// RPCS ////////////
 
 		return ProcessEvent(Object, Function, Parms);
 	}
@@ -828,7 +1311,25 @@ namespace Hooks
 		auto FEVFT = *reinterpret_cast<void***>(Globals::FortEngine);
 		auto PEAddr = FEVFT[62];
 
+		auto BaseAddress = (uintptr_t)GetModuleHandle(NULL);
+
 		MH_CreateHook(reinterpret_cast<LPVOID>(PEAddr), ProcessEventHook, reinterpret_cast<LPVOID*>(&ProcessEvent));
 		MH_EnableHook(reinterpret_cast<LPVOID>(PEAddr));
+
+		MH_CreateHook((LPVOID)(BaseAddress + 0x2494000), Replication::AddToWorldHook, (LPVOID*)(&Replication::AddToWorld));
+		MH_EnableHook((LPVOID)(BaseAddress + 0x2494000));
+		MH_CreateHook((LPVOID)(BaseAddress + 0x253A570), Replication::ServerUpdateLevelVisibilityHook, (LPVOID*)(&Replication::ServerUpdateLevelVisibility));
+		MH_EnableHook((LPVOID)(BaseAddress + 0x253A570));
+		MH_CreateHook((LPVOID)(BaseAddress + 0x21D3D00), Replication::RequestLevelHook, (LPVOID*)(&Replication::RequestLevel));
+		MH_EnableHook((LPVOID)(BaseAddress + 0x21D3D00));
+		
+		Replication::IsGameWorld = decltype(Replication::IsGameWorld)(BaseAddress + 0x249C8B0);
+		Replication::GetWorldAssetPackageFName = decltype(Replication::GetWorldAssetPackageFName)(BaseAddress + 0x21CB7C0);
+		
+
+		/*MH_CreateHook((LPVOID)(BaseAddress + Offsets::PostGameplayEffectExecute), PostGameplayEffectExecuteHook, nullptr);
+		MH_EnableHook((LPVOID)(BaseAddress + Offsets::PostGameplayEffectExecute));*/
+
+		PickupInitialize = decltype(PickupInitialize)(BaseAddress + Offsets::PickupInitialize);
 	}
 }

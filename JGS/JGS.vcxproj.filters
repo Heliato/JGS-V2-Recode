@@ -17,6 +17,9 @@
     <ClCompile Include="SDK\FN_GameplayAbilities_functions.cpp">
       <Filter>SDK\sdk</Filter>
     </ClCompile>
+    <ClCompile Include="SDK\FN_BP_VictoryDrone_functions.cpp">
+      <Filter>SDK\sdk</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Net">

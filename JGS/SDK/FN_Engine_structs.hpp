@@ -2095,6 +2095,15 @@ enum class EAnimationKeyFormat : uint8_t
 	AKF_MAX                        = 3
 };
 
+enum EChannelType
+{
+	CHTYPE_None = 0,
+	CHTYPE_Control = 1,
+	CHTYPE_Actor = 2,
+	CHTYPE_File = 3,
+	CHTYPE_Voice = 4,
+	CHTYPE_MAX = 8,
+};
 
 // Enum Engine.AnimationCompressionFormat
 enum class EAnimationCompressionFormat : uint8_t

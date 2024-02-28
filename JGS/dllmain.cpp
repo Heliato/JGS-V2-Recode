@@ -49,7 +49,11 @@ DWORD WINAPI MainThread(LPVOID)
     SDK::FNameToString = decltype(SDK::FNameToString)(FNameToStringAddress);
     SDK::FreeInternal = decltype(SDK::FreeInternal)(FreeMemoryAddress);
 
-    Hooks::InternalTryActivateAbilityLong = decltype(Hooks::InternalTryActivateAbilityLong)(BaseAddr + Offsets::InternalTryActivateAbility);
+    // Abilities
+    Abilities::InternalTryActivateAbility = decltype(Abilities::InternalTryActivateAbility)(BaseAddr + Offsets::InternalTryActivateAbility);
+    Abilities::InternalTryActivateAbility = decltype(Abilities::InternalTryActivateAbility)(BaseAddr + Offsets::InternalTryActivateAbility);
+    Abilities::InternalTryActivateAbility = decltype(Abilities::InternalTryActivateAbility)(BaseAddr + Offsets::InternalTryActivateAbility);
+
     FMemory_Free = decltype(FMemory_Free)(FreeMemoryAddress);
     FMemory_Realloc = decltype(FMemory_Realloc)(ReallocAddress);
     FMemory_Malloc = decltype(FMemory_Malloc)(MallocAddress);
@@ -62,6 +66,7 @@ DWORD WINAPI MainThread(LPVOID)
     Globals::PC = reinterpret_cast<AFortPlayerController*>(FortEngine->GameInstance->LocalPlayers[0]->PlayerController);
     Globals::MathLib = reinterpret_cast<UKismetMathLibrary*>(UKismetMathLibrary::StaticClass());
     Globals::SystemLib = reinterpret_cast<UKismetSystemLibrary*>(UKismetSystemLibrary::StaticClass());
+    Globals::StringLib = reinterpret_cast<UKismetStringLibrary*>(UKismetStringLibrary::StaticClass());
 
     Globals::HeadPart = FindObjectFast<UCustomCharacterPart>("/Game/Characters/CharacterParts/Female/Medium/Heads/F_Med_Head1.F_Med_Head1");
     Globals::BodyPart = FindObjectFast<UCustomCharacterPart>("/Game/Characters/CharacterParts/Female/Medium/Bodies/F_Med_Soldier_01.F_Med_Soldier_01");
@@ -79,6 +84,7 @@ DWORD WINAPI MainThread(LPVOID)
     LoadLootPools();
 
     Globals::PC->SwitchLevel(TEXT("Athena_Terrain"));
+    //Globals::PC->SwitchLevel(TEXT("Athena_Faceoff"));
 
     Replication::InitOffsets();
 

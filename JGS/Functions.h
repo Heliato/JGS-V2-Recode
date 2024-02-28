@@ -164,12 +164,7 @@ namespace GPFuncs
 		}
 	}
 
-	FVector GetPlayerStart()
-	{
-		TArray<AActor*> OutActors;
-		Globals::GPS->STATIC_GetAllActorsOfClass(Globals::World, APlayerStart::StaticClass(), &OutActors);
-		return OutActors[rand() % OutActors.Num()]->K2_GetActorLocation();
-	}
+	int totalSearchedActors = 0;
 
 	static void MakeEverythingSearched()
 	{
@@ -180,18 +175,27 @@ namespace GPFuncs
 		{
 			auto Actor = (ABuildingContainer*)OutActors[i];
 
-			if (Actor->GetFullName().contains("Tiered_Chest") || Actor->GetFullName().contains("Tiered_Short_Ammo")) continue;
+			if (Actor->GetFullName().contains("Tiered_Chest") || 
+				Actor->GetFullName().contains("Tiered_Short_Ammo")) continue;
+
+			totalSearchedActors++;
 
 			Actor->bAlreadySearched = true;
 			Actor->OnRep_bAlreadySearched();
 		}
 	}
 
-	void SpawnPlayer(AFortPlayerControllerAthena* PlayerController)
+	AFortPawn* SpawnPlayer(AFortPlayerController* PlayerController, FVector& Location, FRotator Rotation, bool NewPlayer = true)
 	{
-		auto Pawn = (APlayerPawn_Athena_C*)(Util::SpawnActor(APlayerPawn_Athena_C::StaticClass(), GPFuncs::GetPlayerStart(), {}));
-		Pawn->bCanBeDamaged = false;
-		Pawn->SetOwner(PlayerController);
+		auto Pawn = (APlayerPawn_Athena_C*)(Util::SpawnActor(APlayerPawn_Athena_C::StaticClass(), Location, Rotation));
+		UWorld* World = Globals::World;
+
+		Pawn->bCanBeDamaged = (NewPlayer == true && !World->GetName().contains("Athena_Faceoff")) ? false : true;
+		Pawn->Owner = PlayerController;
+		Pawn->OnRep_Owner();
+
+		PlayerController->Pawn = Pawn;
+		PlayerController->OnRep_Pawn();
 		PlayerController->Possess(Pawn);
 
 		Pawn->SetMaxHealth(100);
@@ -211,86 +215,43 @@ namespace GPFuncs
 		Pawn->ShieldRegenGameplayEffect = nullptr;
 		Pawn->HealthRegenGameplayEffect = nullptr;
 
-		PlayerController->ClientForceProfileQuery();
-
-		auto RandomParts = Globals::CharacterParts[rand() % Globals::CharacterParts.size()];
-
-		if (RandomParts.HeadPart)
+		if (NewPlayer)
 		{
-			Pawn->ServerChoosePart(EFortCustomPartType::Head, RandomParts.HeadPart);
+			auto RandomParts = Globals::CharacterParts[rand() % Globals::CharacterParts.size()];
+
+			if (RandomParts.HeadPart)
+				Pawn->ServerChoosePart(EFortCustomPartType::Head, RandomParts.HeadPart);
+
+			if (RandomParts.BodyPart)
+				Pawn->ServerChoosePart(EFortCustomPartType::Body, RandomParts.BodyPart);
+
+			if (RandomParts.HatPart)
+				Pawn->ServerChoosePart(EFortCustomPartType::Hat, RandomParts.HatPart);
+
+			auto PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+			PlayerState->bHasFinishedLoading = true;
+			PlayerState->bHasStartedPlaying = true;
+			PlayerState->OnRep_bHasStartedPlaying();
+			PlayerState->OnRep_CharacterParts();
+
+			UFortCheatManager* CheatManager = (UFortCheatManager*)(Globals::GPS->STATIC_SpawnObject(UFortCheatManager::StaticClass(), PlayerController));
+			PlayerController->CheatManager = CheatManager;
+			CheatManager->BackpackSetSize(5);
+
+			static UFortAbilitySet* GlobalAbility = FindObjectFast<UFortAbilitySet>("/Game/Abilities/Player/Generic/Traits/DefaultPlayer/GAS_DefaultPlayer.GAS_DefaultPlayer");
+
+			Abilities::GrantGameplayAbility(GlobalAbility, Pawn);
+
+			auto NewInv = CreateInventoryForPlayerController(PlayerController);
+			NewInv->SetupInventory();
+			NewInv->UpdateInventory();
+
+			PlayerController->bIsDisconnecting = false;
+			PlayerController->bHasClientFinishedLoading = true;
+			PlayerController->bHasServerFinishedLoading = true;
+			PlayerController->bHasInitiallySpawned = true;
 		}
 
-		if (RandomParts.BodyPart)
-		{
-			Pawn->ServerChoosePart(EFortCustomPartType::Body, RandomParts.BodyPart);
-		}
-
-		if (RandomParts.HatPart)
-		{
-			Pawn->ServerChoosePart(EFortCustomPartType::Hat, RandomParts.HatPart);
-		}
-
-		((AFortPlayerState*)Pawn->PlayerState)->OnRep_CharacterParts();
-
-		Pawn->CharacterMovement->bReplicates = true;
-		Pawn->SetReplicateMovement(true);
-		Pawn->OnRep_ReplicatedBasedMovement();
-
-		Pawn->OnRep_ReplicatedMovement();
-
-		PlayerController->bHasServerFinishedLoading = true;
-		PlayerController->OnRep_bHasServerFinishedLoading();
-
-		auto PlayerState = (AFortPlayerStateAthena*)(PlayerController->PlayerState);
-		PlayerState->bAlwaysRelevant = true;
-		PlayerState->PlayerTeam->bAlwaysRelevant = true;
-
-#ifdef DUOS
-		auto TeamIndex = ((uint8_t)PlayerState->TeamIndex.GetValue() % 2 == 0) ? (uint8_t)PlayerState->TeamIndex.GetValue() - 1 : (uint8_t)PlayerState->TeamIndex.GetValue();
-		PlayerState->TeamIndex = (EFortTeam)TeamIndex;
-#endif
-
-#ifdef SAME_TEAM
-		PlayerState->TeamIndex = EFortTeam::HumanPvP_Team69;
-#endif
-		PlayerState->OnRep_TeamIndex();
-
-		PlayerState->bHasFinishedLoading = true;
-		PlayerState->bHasStartedPlaying = true;
-		PlayerState->bIsGameSessionAdmin = true;
-		PlayerState->bIsGameSessionOwner = true;
-		PlayerState->bIsWorldDataOwner = true;
-		PlayerState->bIsReadyToContinue = true;
-		PlayerState->OnRep_bHasStartedPlaying();
-		PlayerState->OnRep_CharacterParts();
-
-		auto NewCheatManager = (UFortCheatManager*)(Globals::GPS->STATIC_SpawnObject(UFortCheatManager::StaticClass(), PlayerController));
-		PlayerController->CheatManager = NewCheatManager;
-		NewCheatManager->BackpackSetSize(5);
-
-		auto NewInv = CreateInventoryForPlayerController(PlayerController);
-		NewInv->SetupInventory();
-		NewInv->UpdateInventory();
-
-		PlayerState->OnRep_HeroType();
-		PlayerState->OnRep_PlayerTeam();
-	}
-
-	void GrantGameplayAbilities(APlayerPawn_Athena_C* InPawn)
-	{
-		static auto AbilitySet = FindObjectFast<UFortAbilitySet>("/Game/Abilities/Player/Generic/Traits/DefaultPlayer/GAS_DefaultPlayer.GAS_DefaultPlayer");
-
-		for (int i = 0; i < AbilitySet->GameplayAbilities.Num(); i++)
-		{
-			auto Ability = AbilitySet->GameplayAbilities[i];
-
-			Abilities::GrantGameplayAbility(InPawn, Ability);
-		}
-
-		static auto ShootingAbility = FindObjectFast<UClass>("/Game/Abilities/Weapons/Ranged/GA_Ranged_GenericDamage.GA_Ranged_GenericDamage_C");
-		if (ShootingAbility)
-		{
-			Abilities::GrantGameplayAbility(InPawn, ShootingAbility);
-		}
+		return Pawn;
 	}
 }

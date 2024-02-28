@@ -19,7 +19,8 @@ static T* FindObjectFast(std::string ObjectName, UClass* ObjectClass = UObject::
     return StaticFindObject(ObjectClass, nullptr, OrigInName, false);
 }
 
-//#define CHEATS
+//#define AUTO_PICKUP
+#define CHEATS
 //#define DBNO_ENABLED
 //#define SAME_TEAM
 //#define LOG_RPCS
@@ -41,6 +42,7 @@ namespace Globals
 	UGameplayStatics* GPS;
 	UKismetMathLibrary* MathLib;
     UKismetSystemLibrary* SystemLib;
+    UKismetStringLibrary* StringLib;
     UCustomCharacterPart* HeadPart;
     UCustomCharacterPart* BodyPart;
     std::vector<UFortItemDefinition*> Traps;

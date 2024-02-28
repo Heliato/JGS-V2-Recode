@@ -13,7 +13,16 @@
 
 using namespace SDK;
 
-#define LOG(str) std::cout << "LogJGS: " << str << std::endl;
+#define LOG(str) std::cout << "LogJGSV2: " << str << std::endl;
+
+static int32 GSRandSeed;
+
+#undef  PI
+#define PI 					(3.1415926535897932f)
+#define SMALL_NUMBER		(1.e-8f)
+#define KINDA_SMALL_NUMBER	(1.e-4f)
+#define BIG_NUMBER			(3.4e+38f)
+#define EULERS_NUMBER       (2.71828182845904523536f)
 
 class Util
 {
@@ -160,5 +169,59 @@ public:
 			return true;
 		else
 			return false;
+	}
+
+	static FORCEINLINE float Sin(float Value) { return sinf(Value); }
+	static FORCEINLINE float Asin(float Value) { return asinf((Value < -1.f) ? -1.f : ((Value < 1.f) ? Value : 1.f)); }
+	static FORCEINLINE float Sinh(float Value) { return sinhf(Value); }
+	static FORCEINLINE float Cos(float Value) { return cosf(Value); }
+	static FORCEINLINE float Acos(float Value) { return acosf((Value < -1.f) ? -1.f : ((Value < 1.f) ? Value : 1.f)); }
+	static FORCEINLINE float Tan(float Value) { return tanf(Value); }
+	static FORCEINLINE float Atan(float Value) { return atanf(Value); }
+	static FORCEINLINE float Sqrt(float Value) { return sqrtf(Value); }
+	static FORCEINLINE float Pow(float A, float B) { return powf(A, B); }
+
+	template< class T >
+	static FORCEINLINE T Max(const T A, const T B)
+	{
+		return (A >= B) ? A : B;
+	}
+
+	template< class T >
+	static FORCEINLINE T Clamp(const T X, const T Min, const T Max)
+	{
+		return X < Min ? Min : X < Max ? X : Max;
+	}
+
+	template< class T, class U >
+	static FORCEINLINE T Lerp(const T& A, const T& B, const U& Alpha)
+	{
+		return (T)(A + Alpha * (B - A));
+	}
+
+	static FORCEINLINE int32 TruncToInt(float F)
+	{
+		return (int32)F;
+	}
+
+	static FORCEINLINE float TruncToFloat(float F)
+	{
+		return (float)TruncToInt(F);
+	}
+
+	static FORCEINLINE float Fractional(float Value)
+	{
+		return Value - TruncToFloat(Value);
+	}
+
+	inline static float SRand()
+	{
+		GSRandSeed = (GSRandSeed * 196314165) + 907633515;
+		union { float f; int32 i; } Result;
+		union { float f; int32 i; } Temp;
+		const float SRandTemp = 1.0f;
+		Temp.f = SRandTemp;
+		Result.i = (Temp.i & 0xff800000) | (GSRandSeed & 0x007fffff);
+		return Fractional(Result.f);
 	}
 };

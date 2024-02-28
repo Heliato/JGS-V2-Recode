@@ -122,63 +122,399 @@ public:
         PC->WorldInventory->Inventory.MarkArrayDirty();
 	}
 
-    void SpawnAllLootInInventory()
+    UFortWorldItem* GetItemInstance(FGuid Guid, bool bVerifMaxStackSize = false)
     {
-        if (PC) {
-            for (int i = 0; i < PC->WorldInventory->Inventory.ItemInstances.Num(); i++)
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+        {
+            UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+            if (!ItemInstance) continue;
+
+            if (Util::AreGuidsTheSame(ItemInstance->GetItemGuid(), Guid))
             {
-                auto ItemInstance = PC->WorldInventory->Inventory.ItemInstances[i];
-                PC->WorldInventory->Inventory.ItemInstances.Remove(i);
+                UFortItemDefinition* ItemDefinition = ItemInstance->GetItemDefinitionBP();
 
-                if (ItemInstance->GetItemDefinitionBP()->GetFullName().contains("FortBuildingItemDefinition"))
+                if (ItemDefinition && ItemInstance->ItemEntry.Count >= ItemDefinition->MaxStackSize && bVerifMaxStackSize)
                     continue;
 
-                if (ItemInstance->GetItemDefinitionBP()->GetFullName().contains("FortEditToolItemDefinition"))
+                return ItemInstance;
+            } 
+        }
+
+        return nullptr;
+    }
+
+    FFortItemEntry* GetReplicatedEntry(FGuid Guid, bool bVerifMaxStackSize = false)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        for (int i = 0; i < WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
+        {
+            FFortItemEntry ItemEntry = WorldInventory->Inventory.ReplicatedEntries[i];
+
+            if (Util::AreGuidsTheSame(ItemEntry.ItemGuid, Guid))
+            {
+                UFortItemDefinition* ItemDefinition = ItemEntry.ItemDefinition;
+
+                if (ItemDefinition && ItemEntry.Count >= ItemDefinition->MaxStackSize && bVerifMaxStackSize)
                     continue;
 
-                if (ItemInstance->GetItemDefinitionBP()->GetFullName().contains("FortWeaponMeleeItemDefinition"))
+                return &ItemEntry;
+            }
+        }
+
+        return nullptr;
+    }
+
+    FGuid GetItemGuid(UFortItemDefinition* ItemDefinition, bool bVerifMaxStackSize = false)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+        {
+            UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+            if (!ItemInstance) continue;
+
+            if (ItemInstance->GetItemDefinitionBP() == ItemDefinition)
+            {
+                if (ItemInstance->ItemEntry.Count >= ItemDefinition->MaxStackSize && bVerifMaxStackSize)
                     continue;
 
-                if (ItemInstance)
+                return ItemInstance->GetItemGuid();
+            }
+        }
+
+        return FGuid();
+    }
+
+    int GetItemSlotQuickbar(UFortItemDefinition* ItemDefinition, EFortQuickBars FortQuickBars, bool bVerifMaxStackSize = false)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+        AFortQuickBars* QuickBars = PC->QuickBars;
+        int Slot = -1;
+
+        if (WorldInventory && QuickBars)
+        {
+            auto QuickBar = (FortQuickBars == EFortQuickBars::Primary) ? QuickBars->PrimaryQuickBar : QuickBars->SecondaryQuickBar;
+            FGuid ItemGuid = GetItemGuid(ItemDefinition, bVerifMaxStackSize);
+            UFortWorldItem* ItemInstance = GetItemInstance(ItemGuid, bVerifMaxStackSize);
+
+            if (ItemInstance)
+            {
+                for (int i = 0; i < QuickBar.Slots.Num(); i++)
                 {
-                    auto NewFortPickup = (AFortPickupAthena*)(Util::SpawnActor(AFortPickupAthena::StaticClass(), PC->Pawn->K2_GetActorLocation(), {}));
-                    NewFortPickup->PrimaryPickupItemEntry = ItemInstance->ItemEntry;
-                    NewFortPickup->OnRep_PrimaryPickupItemEntry();
-                    NewFortPickup->TossPickup(PC->Pawn->K2_GetActorLocation(), nullptr, 999);
+                    FQuickBarSlot Slots = QuickBar.Slots[i];
+                    if (i >= 6) break;
+                    if (!Slots.Items.IsValidIndex(0)) continue;
+
+                    if (Util::AreGuidsTheSame(ItemGuid, Slots.Items[0]))
+                    {
+                        if (ItemInstance->ItemEntry.Count >= ItemDefinition->MaxStackSize && bVerifMaxStackSize)
+                            continue;
+
+                        Slot = i;
+                        break;
+                    }
                 }
             }
+        }
 
-            for (int i = 0; i < PC->WorldInventory->Inventory.ReplicatedEntries.Num(); i++)
+        return Slot;
+    }
+
+    int GetAvailableSlotQuickbar(EFortQuickBars FortQuickBars)
+    {
+        AFortQuickBars* QuickBars = PC->QuickBars;
+        int Slot = -1;
+
+        if (QuickBars)
+        {
+            auto QuickBar = (FortQuickBars == EFortQuickBars::Primary) ? QuickBars->PrimaryQuickBar : QuickBars->SecondaryQuickBar;
+
+            for (int i = 0; i < QuickBar.Slots.Num(); i++)
             {
-                PC->WorldInventory->Inventory.ReplicatedEntries.Remove(i);
+                FQuickBarSlot Slots = QuickBar.Slots[i];
+                if (i >= 6) break;
+                if (Slots.Items.IsValidIndex(0)) continue;
+
+                Slot = i;
+                break;
+            }
+        }
+
+        return Slot;
+    }
+
+    UFortWorldItem* GetItemSlot(int Slot, EFortQuickBars FortQuickBars)
+    {
+        AFortQuickBars* QuickBars = PC->QuickBars;
+
+        if (QuickBars)
+        {
+            auto QuickBar = (FortQuickBars == EFortQuickBars::Primary) ? QuickBars->PrimaryQuickBar : QuickBars->SecondaryQuickBar;
+            FQuickBarSlot Slots = QuickBar.Slots[Slot];
+
+            if (Slot < 6 && Slots.Items.IsValidIndex(0))
+                return GetItemInstance(Slots.Items[0]);
+        }
+
+        return nullptr;
+    }
+
+    AFortWeapon* GetWeapon(FGuid Guid)
+    {
+        UFortWorldItem* ItemInstance = GetItemInstance(Guid);
+        AFortPawn* Pawn = (AFortPawn*)PC->Pawn;
+
+        if (ItemInstance && Pawn)
+        {
+            for (int i = 0; i < Pawn->CurrentWeaponList.Num(); i++)
+            {
+                AFortWeapon* Weapon = Pawn->CurrentWeaponList[i];
+                if (!Weapon) continue;
+
+                if (Util::AreGuidsTheSame(Weapon->ItemEntryGuid, ItemInstance->GetItemGuid()))
+                    return Weapon;
+            }
+        }
+
+        return nullptr;
+    }
+
+    bool RemoveItemFromInventory(FGuid Guid)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+        {
+            UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+            if (!ItemInstance) continue;
+
+            if (Util::AreGuidsTheSame(ItemInstance->GetItemGuid(), Guid))
+            {
+                WorldInventory->Inventory.ItemInstances.Remove(i);
+
+                for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
+                {
+                    FFortItemEntry ItemEntry = WorldInventory->Inventory.ReplicatedEntries[j];
+
+                    if (Util::AreGuidsTheSame(ItemEntry.ItemGuid, Guid))
+                    {
+                        WorldInventory->Inventory.ReplicatedEntries.Remove(j);
+
+                        return true;
+                    }
+                }
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool RemoveItemFromQuickbar(FGuid Guid, EFortQuickBars FortQuickBars = EFortQuickBars::Primary)
+    {
+        AFortQuickBars* QuickBars = PC->QuickBars;
+
+        if (QuickBars)
+        {
+            auto QuickBar = (FortQuickBars == EFortQuickBars::Primary) ? QuickBars->PrimaryQuickBar : QuickBars->SecondaryQuickBar;
+
+            for (int i = 0; i < QuickBar.Slots.Num(); i++)
+            {
+                FQuickBarSlot Slots = QuickBar.Slots[i];
+                if (i >= 6) break;
+
+                if (Slots.Items.IsValidIndex(0))
+                {
+                    if (Util::AreGuidsTheSame(Slots.Items[0], Guid))
+                    {
+                        if (i >= 0)
+                        {
+                            QuickBars->EmptySlot(FortQuickBars, i);
+                            //QuickBars->ServerRemoveItemInternal(Guid, true, true); // works without
+                        }
+
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    UFortWorldItem* AddInventoryItem(UFortItemDefinition* ItemDefinition, FFortItemEntry ItemEntry)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        UFortWorldItem* NewPickupWorldItem = (UFortWorldItem*)ItemDefinition->CreateTemporaryItemInstanceBP(ItemEntry.Count, 1);
+        NewPickupWorldItem->ItemEntry = ItemEntry;
+        NewPickupWorldItem->ItemEntry.Count = ItemEntry.Count;
+        NewPickupWorldItem->SetOwningControllerForTemporaryItem(PC);
+
+        if (WorldInventory)
+        {
+            WorldInventory->Inventory.ItemInstances.Add(NewPickupWorldItem);
+            WorldInventory->Inventory.ReplicatedEntries.Add(NewPickupWorldItem->ItemEntry);
+        }
+
+        return NewPickupWorldItem;
+    }
+
+    bool AddQuickBarItem(FGuid Guid, int Slot, EFortQuickBars FortQuickBars)
+    {
+        UFortWorldItem* ItemInstance = GetItemInstance(Guid);
+        AFortQuickBars* QuickBars = PC->QuickBars;
+
+        if (ItemInstance && QuickBars)
+        {
+            QuickBars->ServerAddItemInternal(ItemInstance->GetItemGuid(), FortQuickBars, Slot);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    bool ModifyCountItem(FGuid Guid, int Count)
+    {
+        UFortWorldItem* ItemInstance = GetItemInstance(Guid);
+        FFortItemEntry ReplicatedEntry = *GetReplicatedEntry(Guid);
+
+        if (ItemInstance)
+        {
+            ItemInstance->ItemEntry.Count = Count;
+            ReplicatedEntry.Count = Count;
+        }
+
+        return false;
+    }
+
+    void SetQuickBarSlot(int Slot, EFortQuickBars FortQuickBars)
+    {
+        AFortQuickBars* QuickBars = PC->QuickBars;
+        AFortPawn* Pawn = (AFortPawn*)PC->Pawn;
+
+        if (QuickBars && Pawn)
+        {
+            auto QuickBar = (FortQuickBars == EFortQuickBars::Primary) ? QuickBars->PrimaryQuickBar : QuickBars->SecondaryQuickBar;
+            UFortWorldItem* PrevItemInstance = GetItemSlot(QuickBar.CurrentFocusedSlot, FortQuickBars);
+            UFortWorldItem* NewItemInstance = GetItemSlot(Slot, FortQuickBars);
+
+            if (PrevItemInstance && NewItemInstance)
+            {
+                AFortWeapon* PrevWeapon = GetWeapon(PrevItemInstance->GetItemGuid());
+                AFortWeapon* NewWeapon = GetWeapon(NewItemInstance->GetItemGuid());
+
+                if (PrevWeapon && NewWeapon)
+                {
+                    /*NewWeapon->OnSetTargeting(true);
+                    Pawn->OnWeaponEquipped(NewWeapon, PrevWeapon);
+                    Pawn->ClientInternalEquipWeapon(NewWeapon);*/
+                    PC->ServerExecuteInventoryItem(NewItemInstance->GetItemGuid());
+                    QuickBar.CurrentFocusedSlot = Slot;
+                    QuickBars->OnRep_PrimaryQuickBar();
+                }
             }
         }
     }
 
-    void ExecuteInventoryItem(FGuid InGuid)
+    AFortPickupAthena* SpawnItem(UFortItemDefinition* ItemDefinition, FFortItemEntry ItemEntry, FVector Location)
     {
-        if (PC)
+        AFortPickupAthena* FortPickup = (AFortPickupAthena*)(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+
+        FortPickup->PrimaryPickupItemEntry.ItemDefinition = ItemDefinition;
+        FortPickup->PrimaryPickupItemEntry.Count = ItemEntry.Count;
+        FortPickup->OnRep_PrimaryPickupItemEntry();
+
+        FortPickup->TossPickup(Location, nullptr, ItemDefinition->MaxStackSize);
+
+        return FortPickup;
+    }
+
+    AFortPickupAthena* DropItemFromInventory(FGuid Guid)
+    {
+        UFortWorldItem* ItemInstance = GetItemInstance(Guid);
+        APawn* Pawn = PC->Pawn;
+
+        if (ItemInstance && Pawn)
         {
-            if (PC->WorldInventory)
+            UFortItemDefinition* ItemDefinition = ItemInstance->GetItemDefinitionBP();
+
+            if (ItemDefinition)
             {
-                auto ItemInstances = PC->WorldInventory->Inventory.ItemInstances;
+                AFortPickupAthena* FortPickup = SpawnItem(ItemDefinition, ItemInstance->ItemEntry, Pawn->K2_GetActorLocation());
 
-                for (int i = 0; i < ItemInstances.Num(); i++)
-                {
-                    auto ItemInstance = ItemInstances[i];
-
-                    if (Util::AreGuidsTheSame(ItemInstance->GetItemGuid(), InGuid))
-                    {
-                        if (PC->Pawn)
-                            ((AFortPlayerPawn*)PC->Pawn)->EquipWeaponDefinition((UFortWeaponItemDefinition*)ItemInstance->GetItemDefinitionBP(), InGuid);
-
-                        if (ItemInstance->GetItemDefinitionBP()->IsA(UFortTrapItemDefinition::StaticClass()))
-                        {
-                            ((AFortPlayerPawn*)PC->Pawn)->PickUpActor(nullptr, (UFortDecoItemDefinition*)ItemInstance->GetItemDefinitionBP());
-                        }
-                    }
-                }
+                return FortPickup;
             }
+        }
+
+        return nullptr;
+    }
+
+    void RemoveAllItemsFromInventory(bool bRemoveCantBeDropped = false)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        if (WorldInventory)
+        {
+            std::vector<FGuid> GuidToRemove;
+
+            for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+            {
+                UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+                if (!ItemInstance) continue;
+
+                FFortItemEntry ItemEntry = ItemInstance->ItemEntry;
+
+                UFortWorldItemDefinition* ItemDefinition = (UFortWorldItemDefinition*)ItemInstance->GetItemDefinitionBP();
+                if (!ItemDefinition) continue;
+
+                if (!ItemDefinition->bCanBeDropped && !bRemoveCantBeDropped)
+                    continue;
+
+                LOG("[" << i << "] RemoveItem: " << ItemDefinition->GetName());
+
+                GuidToRemove.push_back(ItemEntry.ItemGuid);
+            }
+
+            for (FGuid& Guid : GuidToRemove)
+            {
+                RemoveItemFromQuickbar(Guid);
+                RemoveItemFromInventory(Guid);
+            }
+        }
+    }
+
+    void DropAllItemsFromInventory(bool bRemoveCantBeDropped = false)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        if (WorldInventory)
+        {
+            for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+            {
+                UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+                if (!ItemInstance) continue;
+
+                FFortItemEntry ItemEntry = ItemInstance->ItemEntry;
+
+                UFortWorldItemDefinition* ItemDefinition = (UFortWorldItemDefinition*)ItemInstance->GetItemDefinitionBP();
+                if (!ItemDefinition) continue;
+
+                if (!ItemDefinition->bCanBeDropped)
+                    continue;
+
+                LOG("[" << i << "] DropItemFromInventory: " << ItemDefinition->GetName());
+
+                DropItemFromInventory(ItemInstance->GetItemGuid());
+            }
+
+            RemoveAllItemsFromInventory(bRemoveCantBeDropped);
+            UpdateInventory();
         }
     }
 };

@@ -2,138 +2,252 @@
 
 namespace Misc
 {
-	__int64 (*OnReload)(UObject* a1, unsigned int a2);
-	__int64 __fastcall OnReloadHook(AFortWeapon* Weapon, unsigned int a2)
+	void (*PickupDelay)(AFortPickup* Pickup);
+	void (*OnReload)(AFortWeapon* Weapon, unsigned int a2);
+
+	void PickupDelayHook(AFortPickup* Pickup)
 	{
-		if (Weapon)
+		AFortPawn* Pawn = Pickup->PickupLocationData.PickupTarget;
+
+		if (Pawn)
 		{
-			auto ItemDefiniton = (UFortWeaponItemDefinition*)Weapon->WeaponData;
-			auto AmmoDef = ItemDefiniton->GetAmmoWorldItemDefinition_BP();
+			auto PlayerController = (AFortPlayerControllerAthena*)Pawn->Controller;
 
-			if (AmmoDef == nullptr)
-				AmmoDef = ItemDefiniton;
-
-			auto Pawn = (APawn*)Weapon->Owner;
-			auto Controller = (AFortPlayerController*)Pawn->Controller;
-			auto WorldInventory = Controller->WorldInventory;
-			auto QuickBars = Controller->QuickBars;
-
-			for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+			if (PlayerController)
 			{
-				auto ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+				AFortQuickBars* QuickBars = PlayerController->QuickBars;
+				FFortItemEntry ItemEntry = Pickup->PrimaryPickupItemEntry;
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+				UFortItemDefinition* ItemDefinition = ItemEntry.ItemDefinition;
 
-				if (ItemInstance->GetItemDefinitionBP() == AmmoDef)
+				if (QuickBars && PlayerInventory && ItemDefinition)
 				{
-					int newCount = ItemInstance->ItemEntry.Count - a2;
+					bool bSuccessfullyAdded = false;
+					int CountToRemove = 0;
 
-					WorldInventory->Inventory.ItemInstances.Remove(i);
-
-					for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
+					if (ItemDefinition->IsA(UFortWeaponRangedItemDefinition::StaticClass()))
 					{
-						auto Entry = WorldInventory->Inventory.ReplicatedEntries[j];
+						int AvailableSlot = PlayerInventory->GetAvailableSlotQuickbar(EFortQuickBars::Primary);
 
-						if (Entry.ItemDefinition == AmmoDef)
+						if (AvailableSlot != -1)
 						{
-							WorldInventory->Inventory.ReplicatedEntries.Remove(j);
-						}
-					}
+							UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
 
-					if (newCount != 0)
-					{
-						auto NewWorldItem = (UFortWorldItem*)(AmmoDef->CreateTemporaryItemInstanceBP(newCount, 1));
-
-						WorldInventory->Inventory.ReplicatedEntries.Add(NewWorldItem->ItemEntry);
-						WorldInventory->Inventory.ItemInstances.Add(NewWorldItem);
-					}
-					else {
-						/*for (int i = 0; i < QuickBars->PrimaryQuickBar.Slots.Num(); i++)
-						{
-							auto Slot = QuickBars->PrimaryQuickBar.Slots[i];
-
-							if (Slot.Items.IsValidIndex(0))
+							if (NewPickupWorldItem)
 							{
-								if (Util::AreGuidsTheSame(Slot.Items[0], ItemInstance->GetItemGuid()))
-								{
-									if (i != -1)
-										QuickBars->EmptySlot(EFortQuickBars::Primary, i);
+								PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), AvailableSlot, EFortQuickBars::Primary);
+								bSuccessfullyAdded = true;
+							}
+						}
+						else
+						{
+							int ItemSlot = PlayerInventory->GetItemSlotQuickbar(ItemDefinition, EFortQuickBars::Primary, true);
 
-									Slot.Items.Remove(0);
+							if (ItemSlot != -1)
+							{
+								UFortWorldItem* ItemSlotInstance = PlayerInventory->GetItemSlot(ItemSlot, EFortQuickBars::Primary);
+
+								if (ItemSlotInstance)
+								{
+									PlayerInventory->RemoveItemFromQuickbar(ItemSlotInstance->GetItemGuid(), EFortQuickBars::Primary);
+									PlayerInventory->RemoveItemFromInventory(ItemSlotInstance->GetItemGuid());
+
+									ItemEntry.Count = ItemSlotInstance->ItemEntry.Count + ItemEntry.Count;
+
+									if (ItemEntry.Count > ItemDefinition->MaxStackSize)
+									{
+										CountToRemove = ItemEntry.Count - ItemDefinition->MaxStackSize;
+										ItemEntry.Count = ItemDefinition->MaxStackSize;
+									}
+
+									UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+									PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), ItemSlot, EFortQuickBars::Primary);
+
+									bSuccessfullyAdded = true;
 								}
 							}
-						}*/
-					}
-				}
-			}
-
-			FindInventory(Controller)->UpdateInventory();
-		}
-		return OnReload(Weapon, a2);
-	}
-
-	__int64 (*OnBuild)(UObject*, void*);
-	__int64 __fastcall OnBuildHook(AFortPlayerController* Controller, void* a2)
-	{
-		if (Controller)
-		{
-			UFortResourceItemDefinition* ResourceDef = nullptr;
-
-			if (Controller->CurrentResourceType == EFortResourceType::Wood)
-				ResourceDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/WoodItemData.WoodItemData");
-
-			if (Controller->CurrentResourceType == EFortResourceType::Stone)
-				ResourceDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/StoneItemData.StoneItemData");
-
-			if (Controller->CurrentResourceType == EFortResourceType::Metal)
-				ResourceDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/MetalItemData.MetalItemData");
-
-			if (ResourceDef)
-			{
-				auto WorldInventory = Controller->WorldInventory;
-
-				for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
-				{
-					auto ItemInstance = WorldInventory->Inventory.ItemInstances[i];
-
-					if (ItemInstance->GetItemDefinitionBP() == ResourceDef)
-					{
-						int newCount = ItemInstance->ItemEntry.Count - 10;
-
-						WorldInventory->Inventory.ItemInstances.Remove(i);
-
-						for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
-						{
-							auto Entry = WorldInventory->Inventory.ReplicatedEntries[j];
-
-							if (Entry.ItemDefinition == ResourceDef)
+							else
 							{
-								WorldInventory->Inventory.ReplicatedEntries.Remove(j);
+								FQuickBar QuickBar = ItemDefinition->IsA(UFortTrapItemDefinition::StaticClass()) ? QuickBars->SecondaryQuickBar : QuickBars->PrimaryQuickBar;
+
+								int CurrentSlot = QuickBar.CurrentFocusedSlot;
+
+								if (CurrentSlot > 0 && CurrentSlot < 6)
+								{
+									UFortWorldItem* ItemSlotInstance = PlayerInventory->GetItemSlot(CurrentSlot, EFortQuickBars::Primary);
+
+									if (ItemSlotInstance)
+									{
+										PlayerController->ServerSpawnInventoryDrop(ItemSlotInstance->GetItemGuid(), ItemSlotInstance->ItemEntry.Count);
+
+										UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+										PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), CurrentSlot, EFortQuickBars::Primary);
+										PlayerController->ServerExecuteInventoryItem(NewPickupWorldItem->GetItemGuid());
+
+										bSuccessfullyAdded = true;
+									}
+								}
 							}
 						}
+					}
+					else if (ItemDefinition->IsA(UFortTrapItemDefinition::StaticClass()))
+					{
+						FGuid ItemGuid = PlayerInventory->GetItemGuid(ItemDefinition);
+						UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(ItemGuid);
 
-						if (newCount != 0)
+						if (ItemInstance)
 						{
-							auto NewWorldItem = (UFortWorldItem*)(ResourceDef->CreateTemporaryItemInstanceBP(newCount, 1));
+							PlayerInventory->RemoveItemFromInventory(ItemInstance->GetItemGuid());
 
-							WorldInventory->Inventory.ReplicatedEntries.Add(NewWorldItem->ItemEntry);
-							WorldInventory->Inventory.ItemInstances.Add(NewWorldItem);
+							ItemEntry.Count = ItemInstance->ItemEntry.Count + ItemEntry.Count;
+
+							if (ItemEntry.Count > ItemDefinition->MaxStackSize)
+							{
+								CountToRemove = ItemEntry.Count - ItemDefinition->MaxStackSize;
+								ItemEntry.Count = ItemDefinition->MaxStackSize;
+							}
+
+							UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+
+							if (NewPickupWorldItem)
+							{
+								PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), 4, EFortQuickBars::Secondary);
+								bSuccessfullyAdded = true;
+							}
+						}
+						else
+						{
+							UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+
+							if (NewPickupWorldItem)
+							{
+								PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), 4, EFortQuickBars::Secondary);
+								bSuccessfullyAdded = true;
+							}
 						}
 					}
-				}
+					else if (ItemDefinition->IsA(UFortAmmoItemDefinition::StaticClass()) ||
+						ItemDefinition->IsA(UFortResourceItemDefinition::StaticClass()))
+					{
+						FGuid ItemGuid = PlayerInventory->GetItemGuid(ItemDefinition);
+						UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(ItemGuid);
 
-				FindInventory(Controller)->UpdateInventory();
+						if (ItemInstance)
+						{
+							PlayerInventory->RemoveItemFromInventory(ItemInstance->GetItemGuid());
+
+							ItemEntry.Count = ItemInstance->ItemEntry.Count + ItemEntry.Count;
+
+							if (ItemEntry.Count > ItemDefinition->MaxStackSize)
+							{
+								CountToRemove = ItemEntry.Count - ItemDefinition->MaxStackSize;
+								ItemEntry.Count = ItemDefinition->MaxStackSize;
+							}
+
+							PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+							bSuccessfullyAdded = true;
+						}
+						else
+						{
+							PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+							bSuccessfullyAdded = true;
+						}
+					}
+
+					if (bSuccessfullyAdded && CountToRemove > 0)
+					{
+						ItemEntry.Count = CountToRemove;
+						PlayerInventory->SpawnItem(ItemDefinition, ItemEntry, Pawn->K2_GetActorLocation());
+					}
+
+					if (!bSuccessfullyAdded)
+						PlayerInventory->SpawnItem(ItemDefinition, ItemEntry, Pawn->K2_GetActorLocation());
+
+					PlayerInventory->UpdateInventory();
+				}
 			}
 		}
 
-		return OnBuild(Controller, a2);
+		/*Pickup->bPickedUp = bSuccessfullyAdded; // Not Working
+		Pickup->OnRep_bPickedUp();*/
+
+		return PickupDelay(Pickup);
+	}
+
+	void OnReloadHook(AFortWeapon* Weapon, int Count)
+	{
+		if (Weapon && Count > 0)
+		{
+			AFortPawn* Pawn = (AFortPawn*)Weapon->Owner;
+
+			if (Pawn)
+			{
+				AFortPlayerController* PlayerController = (AFortPlayerController*)Pawn->Controller;
+				Inventory* PlayerInventory = FindInventory(PlayerController);
+
+				if (PlayerController && PlayerInventory)
+				{
+					UFortWeaponItemDefinition* ItemDefinition = Weapon->WeaponData;
+					bool bRemoveItem = false;
+
+					if (ItemDefinition)
+					{
+						UFortWeaponItemDefinition* AmmoDefinition = (UFortWeaponItemDefinition*)ItemDefinition->GetAmmoWorldItemDefinition_BP();
+						bool bIsItem = (ItemDefinition == AmmoDefinition);
+
+						if (AmmoDefinition && ItemDefinition != AmmoDefinition)
+							ItemDefinition = AmmoDefinition;
+
+						FGuid ItemGuid = PlayerInventory->GetItemGuid(ItemDefinition);
+						UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(ItemGuid);
+						int ItemSlot = PlayerInventory->GetItemSlotQuickbar(ItemDefinition, EFortQuickBars::Primary);
+
+						if (ItemInstance)
+						{
+							if (ItemSlot != -1)
+								PlayerInventory->RemoveItemFromQuickbar(ItemInstance->GetItemGuid());
+
+							PlayerInventory->RemoveItemFromInventory(ItemInstance->GetItemGuid());
+
+							ItemInstance->ItemEntry.Count = ItemInstance->ItemEntry.Count - Count;
+
+							if (ItemInstance->ItemEntry.Count > 0)
+							{
+								UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemInstance->ItemEntry);
+
+								if (ItemSlot != -1)
+									PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), ItemSlot, EFortQuickBars::Primary);
+							}
+							else
+							{
+								bRemoveItem = (ItemSlot != -1);
+							}
+						}
+					}
+
+					if (bRemoveItem)
+					{
+						UFortWorldItem* PickaxeInstance = PlayerInventory->GetItemSlot(0, EFortQuickBars::Primary);
+
+						if (PickaxeInstance)
+							PlayerController->ServerExecuteInventoryItem(PickaxeInstance->GetItemGuid());
+					}
+
+					PlayerInventory->UpdateInventory();
+				}
+			}
+		}
+
+		return OnReload(Weapon, Count);
 	}
 
 	static void Init()
 	{
 		auto BaseAddr = Util::BaseAddress();
 
-		MH_CreateHook((void*)(BaseAddr + 0x9239C0), OnReloadHook, (void**)(&OnReload));
-		MH_EnableHook((void*)(BaseAddr + 0x9239C0));
-		MH_CreateHook((void*)(BaseAddr + 0x81E0B0), OnBuildHook, (void**)(&OnBuild));
-		MH_EnableHook((void*)(BaseAddr + 0x81E0B0));
+		MH_CreateHook((LPVOID)(BaseAddr + Offsets::PickupDelay), PickupDelayHook, (LPVOID*)(&PickupDelay));
+		MH_EnableHook((LPVOID)(BaseAddr + Offsets::PickupDelay));
+		MH_CreateHook((LPVOID)(BaseAddr + Offsets::OnReload), OnReloadHook, (LPVOID*)(&OnReload));
+		MH_EnableHook((LPVOID)(BaseAddr + Offsets::OnReload));
 	}
 }
