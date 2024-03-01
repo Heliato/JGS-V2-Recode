@@ -343,6 +343,11 @@ struct FName
 		return GetGlobalNames()[ComparisonIndex]->GetAnsiName();
 	};
 
+	inline bool IsValid() const
+	{ 
+		return ComparisonIndex > 0; 
+	}
+
 	inline bool operator==(const FName& other) const
 	{
 		return ComparisonIndex == other.ComparisonIndex;

@@ -1,4 +1,5 @@
 #pragma once
+#include "Inventory.h"
 
 namespace GPFuncs
 {
@@ -18,7 +19,7 @@ namespace GPFuncs
 			{
 				auto SpawnLoc = Actor->K2_GetActorLocation();
 
-				auto NewFortPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), SpawnLoc, FRotator()));
+				auto NewFortPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), SpawnLoc);
 
 				NewFortPickup->PrimaryPickupItemEntry.Count = 1;
 				if (bIsConsumable)
@@ -151,7 +152,7 @@ namespace GPFuncs
 				if (bIsConsumable && NewFortPickup->PrimaryPickupItemEntry.ItemDefinition)
 				{
 					auto AmmoDefintion = ((UFortWorldItemDefinition*)NewFortPickup->PrimaryPickupItemEntry.ItemDefinition)->GetAmmoWorldItemDefinition_BP();
-					auto AmmoPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), NewFortPickup->K2_GetActorLocation(), {}));
+					auto AmmoPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), NewFortPickup->K2_GetActorLocation());
 					AmmoPickup->PrimaryPickupItemEntry.Count = AmmoDefintion->DropCount * 1.25;
 					AmmoPickup->PrimaryPickupItemEntry.ItemDefinition = AmmoDefintion;
 					AmmoPickup->OnRep_PrimaryPickupItemEntry();
@@ -187,7 +188,7 @@ namespace GPFuncs
 
 	AFortPawn* SpawnPlayer(AFortPlayerController* PlayerController, FVector& Location, FRotator Rotation, bool NewPlayer = true)
 	{
-		auto Pawn = (APlayerPawn_Athena_C*)(Util::SpawnActor(APlayerPawn_Athena_C::StaticClass(), Location, Rotation));
+		auto Pawn = Util::SpawnActor<APlayerPawn_Athena_C>(APlayerPawn_Athena_C::StaticClass(), Location, Rotation);
 		UWorld* World = Globals::World;
 
 		Pawn->bCanBeDamaged = (NewPlayer == true && !World->GetName().contains("Athena_Faceoff")) ? false : true;

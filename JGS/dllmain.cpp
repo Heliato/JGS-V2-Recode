@@ -49,16 +49,16 @@ DWORD WINAPI MainThread(LPVOID)
     SDK::FNameToString = decltype(SDK::FNameToString)(FNameToStringAddress);
     SDK::FreeInternal = decltype(SDK::FreeInternal)(FreeMemoryAddress);
 
+    Util::ASpawnActor = decltype(Util::ASpawnActor)(0x21D6C90);
+
     // Abilities
     Abilities::InternalTryActivateAbility = decltype(Abilities::InternalTryActivateAbility)(BaseAddr + Offsets::InternalTryActivateAbility);
-    Abilities::InternalTryActivateAbility = decltype(Abilities::InternalTryActivateAbility)(BaseAddr + Offsets::InternalTryActivateAbility);
-    Abilities::InternalTryActivateAbility = decltype(Abilities::InternalTryActivateAbility)(BaseAddr + Offsets::InternalTryActivateAbility);
+    Abilities::GiveAbility = decltype(Abilities::GiveAbility)(BaseAddr + Offsets::GiveAbility);
 
     FMemory_Free = decltype(FMemory_Free)(FreeMemoryAddress);
     FMemory_Realloc = decltype(FMemory_Realloc)(ReallocAddress);
     FMemory_Malloc = decltype(FMemory_Malloc)(MallocAddress);
-    Abilities::GiveAbility = decltype(Abilities::GiveAbility)(BaseAddr + Offsets::GiveAbility);
-
+    
     auto FortEngine = SDK::UObject::FindObject<UFortEngine>("FortEngine_");
     Globals::FortEngine = FortEngine;
     Globals::World = FortEngine->GameViewport->World;
@@ -67,6 +67,7 @@ DWORD WINAPI MainThread(LPVOID)
     Globals::MathLib = reinterpret_cast<UKismetMathLibrary*>(UKismetMathLibrary::StaticClass());
     Globals::SystemLib = reinterpret_cast<UKismetSystemLibrary*>(UKismetSystemLibrary::StaticClass());
     Globals::StringLib = reinterpret_cast<UKismetStringLibrary*>(UKismetStringLibrary::StaticClass());
+    Globals::DTFunctionLibrary = reinterpret_cast<UDataTableFunctionLibrary*>(UDataTableFunctionLibrary::StaticClass());
 
     Globals::HeadPart = FindObjectFast<UCustomCharacterPart>("/Game/Characters/CharacterParts/Female/Medium/Heads/F_Med_Head1.F_Med_Head1");
     Globals::BodyPart = FindObjectFast<UCustomCharacterPart>("/Game/Characters/CharacterParts/Female/Medium/Bodies/F_Med_Soldier_01.F_Med_Soldier_01");

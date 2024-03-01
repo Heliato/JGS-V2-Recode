@@ -20,7 +20,7 @@ static T* FindObjectFast(std::string ObjectName, UClass* ObjectClass = UObject::
 }
 
 //#define AUTO_PICKUP
-#define CHEATS
+//#define CHEATS
 //#define DBNO_ENABLED
 //#define SAME_TEAM
 //#define LOG_RPCS
@@ -43,6 +43,8 @@ namespace Globals
 	UKismetMathLibrary* MathLib;
     UKismetSystemLibrary* SystemLib;
     UKismetStringLibrary* StringLib;
+    UDataTableFunctionLibrary* DTFunctionLibrary;
+
     UCustomCharacterPart* HeadPart;
     UCustomCharacterPart* BodyPart;
     std::vector<UFortItemDefinition*> Traps;
@@ -147,19 +149,6 @@ static void LoadLootPools()
     Globals::Ammo.push_back(FindObjectFast<UFortItemDefinition>("/Game/Athena/Items/Ammo/AthenaAmmoDataEnergyCell.AthenaAmmoDataEnergyCell"));
 }
 
-// janky but whatever
-static bool IsPickupStackable(UFortItemDefinition* PickupDef)
-{
-    std::string pickupDefName = PickupDef->GetFullName();
-    if (pickupDefName.contains("Athena_Bandage") ||
-        pickupDefName.contains("Athena_Grenade") ||
-        pickupDefName.contains("Athena_Medkit") ||
-        pickupDefName.contains("Athena_Shields")) {
-        return true;
-    }
-    return !PickupDef->IsA(UFortWeaponItemDefinition::StaticClass());
-}
-
 static void LoadCharacterParts()
 {
     //HID_Commando_Athena_05
@@ -234,4 +223,9 @@ static void LoadCharacterParts()
         FindObjectFast<UCustomCharacterPart>("/Game/Athena/Heroes/Meshes/Bodies/M_Med_Soldier_01_Base_ATH.M_Med_Soldier_01_Base_ATH"),
         nullptr
     });
+}
+
+static void LoadTables()
+{
+    StaticLoadObject<UCurveTable>(L"/Game/Athena/Balance/DataTables/AthenaResourceRates.AthenaResourceRates");
 }

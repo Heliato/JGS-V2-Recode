@@ -3,7 +3,7 @@
 namespace Misc
 {
 	void (*PickupDelay)(AFortPickup* Pickup);
-	void (*OnReload)(AFortWeapon* Weapon, unsigned int a2);
+	void (*OnReload)(AFortWeapon* Weapon, int Count);
 
 	void PickupDelayHook(AFortPickup* Pickup)
 	{
@@ -131,6 +131,7 @@ namespace Misc
 					{
 						FGuid ItemGuid = PlayerInventory->GetItemGuid(ItemDefinition);
 						UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(ItemGuid);
+						UFortWorldItem* NewPickupWorldItem = nullptr;
 
 						if (ItemInstance)
 						{
@@ -144,32 +145,62 @@ namespace Misc
 								ItemEntry.Count = ItemDefinition->MaxStackSize;
 							}
 
-							PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+							NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
 							bSuccessfullyAdded = true;
 						}
 						else
 						{
-							PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+							NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
 							bSuccessfullyAdded = true;
 						}
+
+						for (int i = 0; i < NewPickupWorldItem->ItemEntry.StateValues.Num(); i++)
+						{
+							FFortItemEntryStateValue StateValue = NewPickupWorldItem->ItemEntry.StateValues[i];
+							StateValue.IntValue = 1;
+							StateValue.StateType = EFortItemEntryState::ShouldShowItemToast;
+
+							PlayerController->ServerSetInventoryStateValue(NewPickupWorldItem->GetItemGuid(), StateValue);
+						}
+
+						/*for (int i = 0; i < Pickup->PrimaryPickupItemEntry.StateValues.Num(); i++)
+						{
+							FFortItemEntryStateValue StateValue = Pickup->PrimaryPickupItemEntry.StateValues[i];
+							
+							LOG("NameValue: " << FName(StateValue.NameValue).GetName());
+							LOG("IntValue: " << StateValue.IntValue);
+							LOG("StateType: " << (int&)StateValue.StateType);
+						}*/
+
+						/*FFortItemEntryStateValue* StateValue = Pickup->PrimaryPickupItemEntry.StateValues;
+						StateValue->IntValue = 1;
+						StateValue->StateType = EFortItemEntryState::ShouldShowItemToast;*/
+
+						//PlayerInventory->ModifyStateValue(NewPickupWorldItem->GetItemGuid(), NewPickupWorldItem->ItemEntry, *StateValue, true, true);
 					}
 
 					if (bSuccessfullyAdded && CountToRemove > 0)
 					{
 						ItemEntry.Count = CountToRemove;
-						PlayerInventory->SpawnItem(ItemDefinition, ItemEntry, Pawn->K2_GetActorLocation());
+						SpawnItem(ItemDefinition, ItemEntry, Pawn, Pawn->K2_GetActorLocation());
+					}
+
+					if (bSuccessfullyAdded)
+					{
+						Pickup->bPickedUp = true;
+						Pickup->OnRep_bPickedUp();
 					}
 
 					if (!bSuccessfullyAdded)
-						PlayerInventory->SpawnItem(ItemDefinition, ItemEntry, Pawn->K2_GetActorLocation());
-
+					{
+						PlayerController->ServerRemoveInventoryStateValue(ItemEntry.ItemGuid, EFortItemEntryState::NoneState);
+						SpawnItem(ItemDefinition, ItemEntry, Pawn, Pawn->K2_GetActorLocation());
+					}
+						
 					PlayerInventory->UpdateInventory();
 				}
 			}
 		}
-
-		/*Pickup->bPickedUp = bSuccessfullyAdded; // Not Working
-		Pickup->OnRep_bPickedUp();*/
 
 		return PickupDelay(Pickup);
 	}
@@ -189,6 +220,11 @@ namespace Misc
 				{
 					UFortWeaponItemDefinition* ItemDefinition = Weapon->WeaponData;
 					bool bRemoveItem = false;
+
+#ifdef CHEATS
+					if (PlayerController->bInfiniteAmmo)
+						return OnReload(Weapon, Count);
+#endif // CHEATS
 
 					if (ItemDefinition)
 					{
@@ -220,7 +256,7 @@ namespace Misc
 							}
 							else
 							{
-								bRemoveItem = (ItemSlot != -1);
+								//bRemoveItem = (ItemSlot != -1);
 							}
 						}
 					}

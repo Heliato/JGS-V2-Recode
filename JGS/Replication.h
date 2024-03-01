@@ -24,73 +24,15 @@ namespace Replication
 	inline void (*RemoveNetworkActor)(UWorld* World, AActor* Actor);
 	inline void (*AddNetworkActor)(UWorld* World, AActor* Actor);
 	inline float (*GetNetPriority)(APlayerController* PlayerController, const FVector& ViewPos, const FVector& ViewDir, AActor* Viewer, AActor* ViewTarget, UActorChannel* InChannel, float Time, bool bLowBandwidth);
-	inline void (*FlushDormancy)(UNetConnection* Connection, class AActor* Actor);
 	inline void (*GetPlayerViewPoint)(APlayerController* PlayerController, FVector& out_Location, FRotator& out_Rotation);
 	inline static void (*ActorChannelClose)(UActorChannel* Channel);
-
-	inline void (*AddToWorld)(UWorld* World, ULevel* Level, const FTransform& LevelTransform, bool bConsiderTimeLimit);
-	inline void (*ServerUpdateLevelVisibility)(APlayerController* PlayerController, FName PackageName, bool bIsVisible);
-	inline bool (*RequestLevel)(ULevelStreaming* LevelStreaming, UWorld* PersistentWorld, bool bAllowLevelLoadRequests, EReqLevelBlock BlockPolicy);
-	inline FName (*GetWorldAssetPackageFName)(ULevelStreaming* LevelStreaming, char* a2);
-	inline bool (*IsGameWorld)(UWorld* World);
+	inline bool (*ClientHasInitializedLevelFor)(UNetConnection* NetConnection, const AActor* TestActor);
+	//inline bool (*IsLevelInitializedForActor)(UNetDriver* NetDriver, const AActor* InActor, const UNetConnection* InConnection);
 
 	inline bool bFirstBuildConsiderList = false;
 
 	inline std::vector<FNetworkObjectInfo*> NetworkActors;
 	inline std::vector<AActor*> ActorsReplicateOneTime;
-
-	FName GetLODPackageName(ULevelStreaming* LevelStreaming)
-	{
-		if (LevelStreaming->LODPackageNames.IsValidIndex(LevelStreaming->LevelLODIndex))
-		{
-			return LevelStreaming->LODPackageNames[LevelStreaming->LevelLODIndex];
-		}
-		else
-		{
-			return FName("null");
-			//return GetWorldAssetPackageFName(LevelStreaming);
-		}
-	}
-
-	bool RequestLevelHook(ULevelStreaming* LevelStreaming, UWorld* PersistentWorld, bool bAllowLevelLoadRequests, EReqLevelBlock BlockPolicy) // it loads the invisible POI buildings but they are always invisible
-	{
-		bool bResult = RequestLevel(LevelStreaming, PersistentWorld, bAllowLevelLoadRequests, EReqLevelBlock::AlwaysBlock); 
-
-		//const bool bIsGameWorld = IsGameWorld(PersistentWorld);
-		//const FName DesiredPackageName = bIsGameWorld ? GetLODPackageName(LevelStreaming) : FName("null"); //GetWorldAssetPackageFName(LevelStreaming);
-
-		//LOG("RequestLevelHook, bAllowLevelLoadRequests: " << bAllowLevelLoadRequests << ", BlockPolicy: " << (int&)BlockPolicy);
-
-
-		return bResult;
-	}
-
-	void ServerUpdateLevelVisibilityHook(APlayerController* PlayerController, FName PackageName, bool bIsVisible)
-	{
-		//LOG("ServerUpdateLevelVisibilityHook, PlayerController: " << PlayerController->GetName() << ", PackageName: " << PackageName.GetName() << ", bIsVisible: " << bIsVisible);
-
-		return ServerUpdateLevelVisibility(PlayerController, PackageName, bIsVisible);
-	}
-
-	void AddToWorldHook(UWorld* World, ULevel* Level, const FTransform& LevelTransform, bool bConsiderTimeLimit)
-	{
-		//LOG("AddToWorldHook, World: " << World->GetName() << ", Level: " << Level->ActorCluster->GetName() << ", bConsiderTimeLimit: " << bConsiderTimeLimit);
-		/*World->CurrentLevelPendingVisibility = NULL;
-		World->CurrentLevelPendingInvisibility = NULL;
-
-		bool bExecuteNextStep = World->CurrentLevelPendingVisibility == Level || World->CurrentLevelPendingVisibility == NULL;
-
-		if (bExecuteNextStep && World->CurrentLevelPendingVisibility == NULL && World->CurrentLevelPendingInvisibility != Level)
-		{
-			LOG("Visible");
-		}
-		else
-		{
-			LOG("Invisible");
-		}*/
-
-		return AddToWorld(World, Level, LevelTransform, bConsiderTimeLimit);
-	}
 
 	UActorChannel* FindChannel(AActor* Actor, UNetConnection* Connection)
 	{
@@ -125,9 +67,6 @@ namespace Replication
 			return AddNetworkActor(World, Actor);
 
 		if (Actor->IsPendingKill())
-			return AddNetworkActor(World, Actor);
-
-		if (Actor->ActorHasTag(FName("ReplicateOneTime")))
 			return AddNetworkActor(World, Actor);
 
 		for (auto It = NetworkActors.begin(); It != NetworkActors.end(); ++It)
@@ -199,63 +138,6 @@ namespace Replication
 		return nullptr;
 	}
 
-	void FlushActorDormancy(UNetDriver* NetDriver, AActor* Actor) // WITH_SERVER_CODE
-	{
-		for (int32 i = 0; i < NetDriver->ClientConnections.Num(); ++i)
-		{
-			UNetConnection* NetConnection = NetDriver->ClientConnections[i];
-
-			if (NetConnection != NULL)
-				FlushDormancy(NetConnection, Actor);
-		}
-	}
-
-	void SetNetDormancy(AActor* Actor, ENetDormancy NewDormancy)
-	{
-		UWorld* MyWorld = GetWorld(Actor);
-		UNetDriver* NetDriver = MyWorld->NetDriver;
-
-		if (NetDriver)
-		{
-			Actor->NetDormancy = NewDormancy;
-
-			if (NewDormancy <= ENetDormancy::DORM_Awake)
-			{
-				AddNetworkActor(MyWorld, Actor);
-
-				FlushActorDormancy(NetDriver, Actor);
-
-				if (MyWorld->DemoNetDriver && MyWorld->DemoNetDriver != NetDriver)
-					FlushActorDormancy(MyWorld->DemoNetDriver, Actor);
-			}
-		}
-	}
-
-	void FlushNetDormancy(AActor* Actor)
-	{
-		if (Actor->NetDormancy <= ENetDormancy::DORM_Awake)
-			return;
-
-		if (Actor->NetDormancy == ENetDormancy::DORM_Initial)
-			Actor->NetDormancy = ENetDormancy::DORM_DormantAll;
-
-		if (!Actor->bReplicates)
-			return;
-
-		UWorld* MyWorld = GetWorld(Actor);
-
-		AddNetworkActor(MyWorld, Actor);
-
-		UNetDriver* NetDriver = MyWorld->NetDriver;
-		if (NetDriver)
-		{
-			FlushActorDormancy(NetDriver, Actor);
-
-			if (MyWorld->DemoNetDriver && MyWorld->DemoNetDriver != NetDriver)
-				FlushActorDormancy(MyWorld->DemoNetDriver, Actor);
-		}
-	}
-
 	UActorChannel* ReplicateToClient(AActor* InActor, UNetConnection* InConnection)
 	{
 		if (!InActor || !InConnection) return nullptr;
@@ -274,11 +156,6 @@ namespace Replication
 
 		return nullptr;
 	}
-
-	bool IsRelevancyOwnerFor(AActor* Actor, const AActor* ReplicatedActor, const AActor* ActorOwner, const AActor* ConnectionActor)
-	{
-		return (ActorOwner == Actor);
-	}
 	
 	bool IsActorRelevantToConnection(AActor* Actor, UNetConnection* NetConnection)
 	{
@@ -295,35 +172,11 @@ namespace Replication
 
 	bool IsLevelInitializedForActor(UNetDriver* NetDriver, AActor* InActor, UNetConnection* InConnection)
 	{
-		//NetDriver->Vtable[0x69]; //  idk
-
-		const bool bCorrectWorld = true;// (InConnection->ClientHasInitializedLevelFor(InActor));
+		//const bool bCorrectWorld = (InConnection->ClientWorldPackageName == GetWorldPackage()->GetFName() && InConnection->ClientHasInitializedLevelFor(InActor));
+		const bool bCorrectWorld = true && ClientHasInitializedLevelFor(InConnection, InActor);
 		const bool bIsConnectionPC = (InActor == InConnection->PlayerController);
 
 		return bCorrectWorld || bIsConnectionPC;
-
-		return (*(bool(__fastcall**)(UNetDriver*, AActor*, UNetConnection*))(__int64(NetDriver) + 0x348))(NetDriver, InActor, InConnection); // idk
-	}
-
-	static UNetConnection* IsActorOwnedByAndRelevantToConnection(const AActor* Actor, UNetConnection* Connection, bool& bOutHasNullViewTarget)
-	{
-		const AActor* ActorOwner = Actor->Owner;
-
-		bOutHasNullViewTarget = false;
-
-		if (Connection->ViewTarget == nullptr)
-		{
-			bOutHasNullViewTarget = true;
-		}
-
-		if (ActorOwner == Connection->PlayerController ||
-			(Connection->PlayerController && ActorOwner == Connection->PlayerController->Pawn) ||
-			(Connection->ViewTarget && IsRelevancyOwnerFor(Connection->ViewTarget, Actor, ActorOwner, Connection->OwningActor)))
-		{
-			return Connection;
-		}
-
-		return nullptr;
 	}
 
 	int32 ServerReplicateActors_PrepConnections(UNetDriver* NetDriver, const float DeltaSeconds)
@@ -402,13 +255,6 @@ namespace Replication
 
 			if ((Actor->bActorIsBeingDestroyed || Actor->IsPendingKill()))
 				continue;
-
-			if (Actor->NetDormancy == ENetDormancy::DORM_DormantAll) // Maybe the fix for invisible POIs idk
-			{
-				/*Actor->SetReplicates(true);
-				SetNetDormancy(Actor, ENetDormancy::DORM_Awake);
-				FlushNetDormancy(Actor);*/
-			}
 
 			if (Actor->RemoteRole == ENetRole::ROLE_None)
 				continue;
@@ -552,13 +398,6 @@ namespace Replication
 						continue;
 					}
 
-					if (Actor->NetDormancy == ENetDormancy::DORM_DormantAll) // Maybe the fix for invisible POIs idk
-					{
-						/*Actor->SetReplicates(true);
-						SetNetDormancy(Actor, ENetDormancy::DORM_Awake);
-						FlushNetDormancy(Actor);*/
-					}
-
 					if (Actor->RemoteRole == ENetRole::ROLE_None)
 					{
 						RemoveNetworkActorHook(NetDriver->World, Actor);
@@ -617,6 +456,12 @@ namespace Replication
 					if (Actor->NetTag != NetDriver->NetTag)
 						Actor->NetTag = NetDriver->NetTag;
 
+					if (!Channel)
+					{
+						if (!IsLevelInitializedForActor(NetDriver, Actor, Connection))
+							continue;
+					}
+
 					if (!Channel) Channel = ReplicateToClient(Actor, Connection);
 					if (Channel) ReplicateActor(Channel);
 
@@ -661,8 +506,13 @@ namespace Replication
 		CallPreReplication = decltype(CallPreReplication)(BaseAddress + Offsets::CallPreReplication);
 		ReplicateActor = decltype(ReplicateActor)(BaseAddress + Offsets::ReplicateActor);
 		GetNetPriority = decltype(GetNetPriority)(BaseAddress + Offsets::GetNetPriority);
-		FlushDormancy = decltype(FlushDormancy)(BaseAddress + Offsets::FlushDormancy);
 		GetPlayerViewPoint = decltype(GetPlayerViewPoint)(BaseAddress + Offsets::GetPlayerViewPoint);
 		ActorChannelClose = decltype(ActorChannelClose)(BaseAddress + Offsets::ActorChannelClose);
+		ClientHasInitializedLevelFor = decltype(ClientHasInitializedLevelFor)(BaseAddress + Offsets::ClientHasInitializedLevelFor);
+
+		if (Globals::World->NetDriver)
+		{
+			//IsLevelInitializedForActor = decltype(IsLevelInitializedForActor)(Globals::World->NetDriver->Vtable[0x69]);
+		}
 	}
 }

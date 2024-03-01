@@ -1,25 +1,32 @@
 ﻿  dllmain.cpp
 C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Containers.h(230,31): warning C4267: '=' : conversion de 'size_t' en 'int32_t', perte possible de données
 C:\Users\antho\Desktop\JGS-V2-Recode\JGS\SDK\FN_Basic.hpp(167,17): warning C4267: '=' : conversion de 'size_t' en 'int32_t', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(152,25): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(153,26): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(154,25): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(155,25): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
 C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Classes.h(85,20): warning C4244: 'initialisation' : conversion de 'double' en 'float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(431,94): warning C4244: 'initialisation' : conversion de 'double' en 'float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(431,35): warning C4244: 'initialisation' : conversion de 'double' en 'const float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(588,97): warning C4244: 'initialisation' : conversion de 'double' en 'float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(588,38): warning C4244: 'initialisation' : conversion de 'double' en 'const float', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Inventory.h(105,28): warning C4858: abandon de la valeur retournée : This member function returns a bool indicating whether the container is empty and has no other effects. It is not useful to call this member function and discard the return value. Use the 'clear()' member function if you want to erase all elements.
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Functions.h(26,70): warning C4305: 'argument' : troncation de 'double' à 'float'
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Functions.h(155,74): warning C4244: '=' : conversion de 'double' en 'int', perte possible de données
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Hooks.h(977,69): warning C4305: 'argument' : troncation de 'double' à 'float'
-C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Hooks.h(1101,74): warning C4244: '=' : conversion de 'double' en 'int', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(277,94): warning C4244: 'initialisation' : conversion de 'double' en 'float', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(277,35): warning C4244: 'initialisation' : conversion de 'double' en 'const float', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(427,97): warning C4244: 'initialisation' : conversion de 'double' en 'float', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Replication.h(427,38): warning C4244: 'initialisation' : conversion de 'double' en 'const float', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Inventory.h(187,28): warning C4858: abandon de la valeur retournée : This member function returns a bool indicating whether the container is empty and has no other effects. It is not useful to call this member function and discard the return value. Use the 'clear()' member function if you want to erase all elements.
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Functions.h(27,70): warning C4305: 'argument' : troncation de 'double' à 'float'
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Functions.h(156,74): warning C4244: '=' : conversion de 'double' en 'int', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Hooks.h(842,36): warning C4244: 'initialisation' : conversion de 'float' en 'int', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Hooks.h(843,27): warning C4244: 'initialisation' : conversion de 'double' en 'int', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Hooks.h(1343,69): warning C4305: 'argument' : troncation de 'double' à 'float'
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Hooks.h(1467,74): warning C4244: '=' : conversion de 'double' en 'int', perte possible de données
 C:\Users\antho\Desktop\JGS-V2-Recode\JGS\dllmain.cpp(37,15): warning C4244: 'argument' : conversion de 'time_t' en 'unsigned int', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(263,25): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Inventory.h(52,43): message : voir la référence à l'instanciation de la fonction modèle 'ActorType *Util::SpawnActor<SDK::AFortPickupAthena>(SDK::UClass *,SDK::FVector,SDK::FRotator,SDK::FVector,const FActorSpawnParameters &)' en cours de compilation
+          with
+          [
+              ActorType=SDK::AFortPickupAthena
+          ]
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(264,26): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(265,25): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
+C:\Users\antho\Desktop\JGS-V2-Recode\JGS\Util.h(266,25): warning C4244: '=' : conversion de 'double' en 'float', perte possible de données
 LINK : warning LNK4098: conflit entre la bibliothèque par défaut 'LIBCMTD' et les autres bibliothèques ; utilisez /NODEFAULTLIB:library
   Génération de code en cours
-  16 of 984 functions ( 1.6%) were compiled, the rest were copied from previous compilation.
-    1 functions were new in current compilation
-    32 functions had inline decision re-evaluated but remain unchanged
+  154 of 949 functions (16.2%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    79 functions had inline decision re-evaluated but remain unchanged
   Fin de la génération du code
   JGS.vcxproj -> C:\Users\antho\Desktop\JGS-V2-Recode\x64\Release\JGS.dll

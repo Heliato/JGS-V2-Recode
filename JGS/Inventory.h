@@ -2,6 +2,88 @@
 
 #include <map>
 
+void (*PickupInitialize)(AFortPickup* Pickup, FFortItemEntry ItemEntry, TArray<FFortItemEntry> MultiItemPickupEntries, bool bSplitOnPickup);
+void (*PickupCombine)(__int64 a1, __int64 a2);
+
+AFortPickupAthena* GetClosestPickup(UFortItemDefinition* FortItemDefinition, FVector Location, float MaxDistance)
+{
+    TArray<AActor*> Actors;
+    Globals::GPS->STATIC_GetAllActorsOfClass(Globals::World, AFortPickupAthena::StaticClass(), &Actors);
+
+    AFortPickupAthena* ClosestPickup = nullptr;
+    float ClosestDistance = FLT_MAX;
+
+    for (int i = 0; i < Actors.Num(); i++)
+    {
+        AFortPickupAthena* FortPickup = (AFortPickupAthena*)Actors[i];
+        if (!FortPickup) continue;
+
+        float Distance = (Location - FortPickup->K2_GetActorLocation()).SizeSquared();
+
+        if (Distance < ClosestDistance && Util::Sqrt(Distance) <= MaxDistance)
+        {
+            FFortItemEntry ItemEntry = FortPickup->PrimaryPickupItemEntry;
+            UFortItemDefinition* ItemDefinition = ItemEntry.ItemDefinition;
+            if (!ItemDefinition) continue;
+
+            if (!FortPickup->bPickedUp && ItemEntry.Count < ItemDefinition->MaxStackSize && FortItemDefinition == ItemDefinition)
+            {
+                ClosestDistance = Distance;
+                ClosestPickup = FortPickup;
+            }
+        }
+    }
+
+    return ClosestPickup;
+}
+
+void PickupCombineHook(__int64 a1, __int64 a2)
+{
+    LOG("PickupCombineHook");
+
+    LOG("a1: " << a1);
+    LOG("a2: " << a2);
+
+    return PickupCombine(a1, a2);
+}
+
+AFortPickupAthena* SpawnItem(UFortItemDefinition* ItemDefinition, FFortItemEntry ItemEntry, AFortPawn* Pawn, FVector Location)
+{
+    AFortPickupAthena* FortPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
+    AFortPickupAthena* CombinePickup = GetClosestPickup(ItemDefinition, Location, 150.f);
+
+    if (Pawn)
+        FortPickup->PawnWhoDroppedPickup = Pawn;
+
+    //FortPickup->bRandomRotation = true; Find Offset
+
+    FFortItemEntry* PrimaryPickupItemEntry = &FortPickup->PrimaryPickupItemEntry;
+    PickupInitialize(FortPickup, ItemEntry, FortPickup->MultiItemPickupEntries, false);
+
+    PrimaryPickupItemEntry->Count = ItemEntry.Count;
+
+    FFortPickupLocationData* PickupLocationData = &FortPickup->PickupLocationData;
+
+    if (CombinePickup && false)
+    {
+        PickupLocationData->CombineTarget = CombinePickup;
+        PickupLocationData->LootFinalPosition == Location;
+        PickupLocationData->LootInitialPosition == FortPickup->K2_GetActorLocation();
+        PickupLocationData->FlyTime = 1.40f;
+        PickupLocationData->ItemOwner = Pawn;
+        PickupLocationData->FinalTossRestLocation == CombinePickup->K2_GetActorLocation();
+
+        FortPickup->OnRep_PickupLocationData();
+        FortPickup->ForceNetUpdate();
+    }
+    else
+    {
+        FortPickup->TossPickup(Location, Pawn, 0);
+    }
+
+    return FortPickup;
+}
+
 class Inventory
 {
 public:
@@ -68,7 +150,7 @@ public:
     {
         std::map<UFortItemDefinition*, int> ItemsToAddMap;
 
-        auto NewQuickBars = (AFortQuickBars*)Util::SpawnActor(AFortQuickBars::StaticClass(), {}, {});
+        auto NewQuickBars = Util::SpawnActor<AFortQuickBars>(AFortQuickBars::StaticClass(), FVector());
         NewQuickBars->SetOwner(PC);
         PC->QuickBars = NewQuickBars;
         PC->OnRep_QuickBar();
@@ -145,7 +227,7 @@ public:
         return nullptr;
     }
 
-    FFortItemEntry* GetReplicatedEntry(FGuid Guid, bool bVerifMaxStackSize = false)
+    FFortItemEntry GetReplicatedEntry(FGuid Guid, bool bVerifMaxStackSize = false)
     {
         AFortInventory* WorldInventory = PC->WorldInventory;
 
@@ -160,11 +242,11 @@ public:
                 if (ItemDefinition && ItemEntry.Count >= ItemDefinition->MaxStackSize && bVerifMaxStackSize)
                     continue;
 
-                return &ItemEntry;
+                return ItemEntry;
             }
         }
 
-        return nullptr;
+        return FFortItemEntry();
     }
 
     FGuid GetItemGuid(UFortItemDefinition* ItemDefinition, bool bVerifMaxStackSize = false)
@@ -223,7 +305,7 @@ public:
         return Slot;
     }
 
-    int GetAvailableSlotQuickbar(EFortQuickBars FortQuickBars)
+    int GetAvailableSlotQuickbar(EFortQuickBars FortQuickBars, int MaxSlots = 6)
     {
         AFortQuickBars* QuickBars = PC->QuickBars;
         int Slot = -1;
@@ -235,7 +317,7 @@ public:
             for (int i = 0; i < QuickBar.Slots.Num(); i++)
             {
                 FQuickBarSlot Slots = QuickBar.Slots[i];
-                if (i >= 6) break;
+                if (i >= MaxSlots) break;
                 if (Slots.Items.IsValidIndex(0)) continue;
 
                 Slot = i;
@@ -346,12 +428,15 @@ public:
         return false;
     }
 
-    UFortWorldItem* AddInventoryItem(UFortItemDefinition* ItemDefinition, FFortItemEntry ItemEntry)
+    UFortWorldItem* AddInventoryItem(UFortItemDefinition* ItemDefinition, FFortItemEntry ItemEntry, bool bUseNewItemEntry = false)
     {
         AFortInventory* WorldInventory = PC->WorldInventory;
 
         UFortWorldItem* NewPickupWorldItem = (UFortWorldItem*)ItemDefinition->CreateTemporaryItemInstanceBP(ItemEntry.Count, 1);
-        NewPickupWorldItem->ItemEntry = ItemEntry;
+
+        if (bUseNewItemEntry)
+            NewPickupWorldItem->ItemEntry = ItemEntry;
+
         NewPickupWorldItem->ItemEntry.Count = ItemEntry.Count;
         NewPickupWorldItem->SetOwningControllerForTemporaryItem(PC);
 
@@ -379,10 +464,10 @@ public:
         return false;
     }
 
-    bool ModifyCountItem(FGuid Guid, int Count)
+    bool ModifyCountItem(FGuid Guid, int Count) // Remake
     {
         UFortWorldItem* ItemInstance = GetItemInstance(Guid);
-        FFortItemEntry ReplicatedEntry = *GetReplicatedEntry(Guid);
+        FFortItemEntry ReplicatedEntry = GetReplicatedEntry(Guid);
 
         if (ItemInstance)
         {
@@ -415,24 +500,12 @@ public:
                     Pawn->OnWeaponEquipped(NewWeapon, PrevWeapon);
                     Pawn->ClientInternalEquipWeapon(NewWeapon);*/
                     PC->ServerExecuteInventoryItem(NewItemInstance->GetItemGuid());
+                    Pawn->CurrentWeapon->ItemEntryGuid = NewItemInstance->GetItemGuid();
                     QuickBar.CurrentFocusedSlot = Slot;
                     QuickBars->OnRep_PrimaryQuickBar();
                 }
             }
         }
-    }
-
-    AFortPickupAthena* SpawnItem(UFortItemDefinition* ItemDefinition, FFortItemEntry ItemEntry, FVector Location)
-    {
-        AFortPickupAthena* FortPickup = (AFortPickupAthena*)(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
-
-        FortPickup->PrimaryPickupItemEntry.ItemDefinition = ItemDefinition;
-        FortPickup->PrimaryPickupItemEntry.Count = ItemEntry.Count;
-        FortPickup->OnRep_PrimaryPickupItemEntry();
-
-        FortPickup->TossPickup(Location, nullptr, ItemDefinition->MaxStackSize);
-
-        return FortPickup;
     }
 
     AFortPickupAthena* DropItemFromInventory(FGuid Guid)
@@ -446,7 +519,7 @@ public:
 
             if (ItemDefinition)
             {
-                AFortPickupAthena* FortPickup = SpawnItem(ItemDefinition, ItemInstance->ItemEntry, Pawn->K2_GetActorLocation());
+                AFortPickupAthena* FortPickup = SpawnItem(ItemDefinition, ItemInstance->ItemEntry, (AFortPawn*)Pawn, Pawn->K2_GetActorLocation());
 
                 return FortPickup;
             }
@@ -475,8 +548,6 @@ public:
 
                 if (!ItemDefinition->bCanBeDropped && !bRemoveCantBeDropped)
                     continue;
-
-                LOG("[" << i << "] RemoveItem: " << ItemDefinition->GetName());
 
                 GuidToRemove.push_back(ItemEntry.ItemGuid);
             }
@@ -508,13 +579,67 @@ public:
                 if (!ItemDefinition->bCanBeDropped)
                     continue;
 
-                LOG("[" << i << "] DropItemFromInventory: " << ItemDefinition->GetName());
-
                 DropItemFromInventory(ItemInstance->GetItemGuid());
             }
 
             RemoveAllItemsFromInventory(bRemoveCantBeDropped);
             UpdateInventory();
+        }
+    }
+
+
+
+
+
+
+    void ModifyStateValue(FGuid Guid, FFortItemEntry Entry, FFortItemEntryStateValue StateValue, bool bAdd, bool bMarkDirty)
+    {
+        AFortInventory* WorldInventory = PC->WorldInventory;
+
+        for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+        {
+            UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+            if (!ItemInstance) continue;
+
+            if (Util::AreGuidsTheSame(ItemInstance->GetItemGuid(), Guid))
+            {
+                FFortItemEntry ItemEntry = ItemInstance->ItemEntry;
+                TArray<FFortItemEntryStateValue> StateValues = ItemEntry.StateValues;
+
+                if (!bAdd)
+                {
+                    for (int i = 0; i < StateValues.Num(); i++)
+                    {
+                        StateValues.Remove(i);
+                    }
+                }
+                else
+                {
+                    StateValues.Add(StateValue);
+                }
+
+                for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
+                {
+                    FFortItemEntry ReplicateItemEntry = WorldInventory->Inventory.ReplicatedEntries[j];
+
+                    if (Util::AreGuidsTheSame(ReplicateItemEntry.ItemGuid, Guid))
+                    {
+                        TArray<FFortItemEntryStateValue> ReplicateStateValues = ReplicateItemEntry.StateValues;
+
+                        if (!bAdd)
+                        {
+                            for (int i = 0; i < ReplicateStateValues.Num(); i++)
+                            {
+                                ReplicateStateValues.Remove(i);
+                            }
+                        }
+                        else
+                        {
+                            ReplicateStateValues.Add(StateValue);
+                        }
+                    }
+                }
+            }
         }
     }
 };

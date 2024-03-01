@@ -49,7 +49,7 @@ namespace Beacons
 
 		UWorld* World = Globals::World;
 
-		AOnlineBeaconHost* Beacon = (AOnlineBeaconHost*)(Util::SpawnActor(AOnlineBeaconHost::StaticClass(), {}, {}));
+		AOnlineBeaconHost* Beacon = Util::SpawnActor<AOnlineBeaconHost>(AOnlineBeaconHost::StaticClass(), FVector());
         Beacon->ListenPort = 7777 - 1;
 
         if (World->NetDriver)

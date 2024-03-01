@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <time.h>
 #include <vector>
+#include <unordered_map>
+#include <functional>
+#include <string>
+#include <sstream>
 
 enum ENetMode
 {
@@ -13,10 +17,53 @@ enum ENetMode
 	NM_MAX,
 };
 
+std::vector<std::string> split(const std::string& s, char delimiter) {
+	std::vector<std::string> tokens;
+	std::string token;
+	std::istringstream tokenStream(s);
+	while (std::getline(tokenStream, token, delimiter)) {
+		tokens.push_back(token);
+	}
+	return tokens;
+}
+
 namespace Hooks
 {
-	__int64 (*PickupInitialize)(AFortPickup* Pickup, FFortItemEntry ItemEntry, TArray<FFortItemEntry> MultiItemPickupEntries, bool bSplitOnPickup);
-	void (*PickupCombine)(__int64 a1, __int64 a2);
+	void (*TestPickup1)(__int64 a1, __int64 a2);
+	void (*TestPickup2)(__int64 a1, __int64 a2, float a3, __int64 a4, char a5);
+	char (*TestPickup3)(__int64 a1);
+
+	/*void TestPickup1Hook(__int64 a1, __int64 a2)
+	{
+		LOG("TestPickup1Hook");
+
+		LOG("a1: " << a1);
+		LOG("a2: " << a2);
+
+		return TestPickup1(a1, a2);
+	}
+
+	void TestPickup2Hook(__int64 a1, __int64 a2, float a3, __int64 a4, char a5)
+	{
+		LOG("TestPickup2Hook");
+
+		LOG("a1: " << a1);
+		LOG("a2: " << a2);
+		LOG("a3: " << a3);
+		LOG("a4: " << a4);
+		LOG("a5: " << a5);
+
+		return TestPickup2(a1, a2, a3, a4, a5);
+	}
+
+	char TestPickup3Hook(__int64 a1)
+	{
+		LOG("TestPickup3Hook");
+
+		LOG("a1: " << a1);
+
+		return TestPickup3(a1);
+	}*/
 
 	char sub_7FF66CA1FB60Hook(AFortGameModeAthena* a1)
 	{
@@ -104,94 +151,21 @@ namespace Hooks
 				LOG("NetworkActors: " << Replication::NetworkActors.size());
 			}
 
-			if (GetAsyncKeyState(VK_F3) & 0x1)
+			/*if (GetAsyncKeyState(VK_F3) & 0x1)
 			{
-				auto World = Globals::FortEngine->GameViewport->World;
-				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
 
-				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
-				Inventory* PlayerInventory = FindInventory(PlayerController);
+			}*/
 
-				if (Pawn && PlayerInventory)
-				{
-					for (int i = 0; i < PlayerController->QuickBars->PrimaryQuickBar.Slots.Num(); i++)
-					{
-						FQuickBarSlot Slot = PlayerController->QuickBars->PrimaryQuickBar.Slots[i];
-
-						for (int j = 0; j < Slot.Items.Num(); j++)
-						{
-							if (Slot.Items.IsValidIndex(j) && PlayerInventory->GetItemInstance(Slot.Items[j]))
-							{
-								LOG("[" << i << "] ItemDefinition: " << PlayerInventory->GetItemInstance(Slot.Items[j])->GetItemDefinitionBP()->GetName());
-							}
-							else
-							{
-								LOG("[" << i << "] AvaibleSlot");
-							}
-						}
-					}
-				}
-			}
-
-			if (GetAsyncKeyState(VK_F2) & 0x1)
+			/*if (GetAsyncKeyState(VK_F2) & 0x1)
 			{
-				auto World = Globals::FortEngine->GameViewport->World;
-				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
-
-				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
-				Inventory* PlayerInventory = FindInventory(PlayerController);
-
-				if (Pawn && PlayerInventory)
-				{
-					for (int i = 0; i < PlayerController->QuickBars->SecondaryQuickBar.Slots.Num(); i++)
-					{
-						FQuickBarSlot Slot = PlayerController->QuickBars->SecondaryQuickBar.Slots[i];
-
-						for (int j = 0; j < Slot.Items.Num(); j++)
-						{
-							if (Slot.Items.IsValidIndex(j) && PlayerInventory->GetItemInstance(Slot.Items[j]))
-							{
-								LOG("[" << i << "] ItemDefinition: " << PlayerInventory->GetItemInstance(Slot.Items[j])->GetItemDefinitionBP()->GetName());
-							}
-							else
-							{
-								LOG("[" << i << "] AvaibleSlot");
-							}
-						}
-					}
-				}
-			}
+				
+			}*/
 
 			if (GetAsyncKeyState(VK_F1) & 0x1)
 			{
-				auto World = Globals::FortEngine->GameViewport->World;
-				auto PlayerController = (AFortPlayerControllerAthena*)Globals::GPS->STATIC_GetPlayerController(World, 0);
-
-				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
-				Inventory* PlayerInventory = FindInventory(PlayerController);
-
-				//UFortWeaponRangedItemDefinition* ItemDefinition = FindObjectFast<UFortWeaponRangedItemDefinition>("/Game/Athena/Items/Consumables/Bandage/Athena_Bandage.Athena_Bandage");
-				//UFortAmmoItemDefinition* ItemDefinition = FindObjectFast<UFortAmmoItemDefinition>("/Game/Athena/Items/Ammo/AthenaAmmoDataBulletsMedium.AthenaAmmoDataBulletsMedium");
-
-				UFortTrapItemDefinition* ItemDefinition1 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Ceiling_Electric_Single_Athena_R_T03.TID_Ceiling_Electric_Single_Athena_R_T03");
-				UFortTrapItemDefinition* ItemDefinition2 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Floor_Player_Jump_Pad_Athena.TID_Floor_Player_Jump_Pad_Athena");
-				UFortTrapItemDefinition* ItemDefinition3 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Floor_Player_Jump_Pad_Free_Direction_Athena.TID_Floor_Player_Jump_Pad_Free_Direction_Athena");
-				UFortTrapItemDefinition* ItemDefinition4 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Floor_Spikes_Athena_R_T03.TID_Floor_Spikes_Athena_R_T03");
-				UFortTrapItemDefinition* ItemDefinition5 = FindObjectFast<UFortTrapItemDefinition>("/Game/Athena/Items/Traps/TID_Wall_Electric_Athena_R_T03.TID_Wall_Electric_Athena_R_T03");
-
-				if (Pawn && PlayerInventory)
-				{
-					FFortItemEntry ItemEntry;
-					ItemEntry.Count = 1;
-
-					PlayerInventory->SpawnItem(ItemDefinition1, ItemEntry, Pawn->K2_GetActorLocation());
-					PlayerInventory->SpawnItem(ItemDefinition2, ItemEntry, Pawn->K2_GetActorLocation());
-					PlayerInventory->SpawnItem(ItemDefinition3, ItemEntry, Pawn->K2_GetActorLocation());
-					PlayerInventory->SpawnItem(ItemDefinition4, ItemEntry, Pawn->K2_GetActorLocation());
-					PlayerInventory->SpawnItem(ItemDefinition5, ItemEntry, Pawn->K2_GetActorLocation());
-				}
+				
 			}
-#endif // CHEAT
+#endif // CHEATS
 		}
 
 		if (bLogs)
@@ -394,7 +368,6 @@ namespace Hooks
 				!FuncName.contains("Triggered_") &&
 				!FuncName.contains("ActorHasTag") &&
 				!FuncName.contains("RandomIntegerInRange") &&
-				!FuncName.contains("ClientReportDamagedResourceBuilding") &&
 				!FuncName.contains("GetItemDefinitionBP") &&
 				!FuncName.contains("CreateTemporaryItemInstanceBP") &&
 				!FuncName.contains("SetOwningControllerForTemporaryItem") &&
@@ -494,6 +467,7 @@ namespace Hooks
 				//*(bool*)GIsServer() = true;
 
 				StaticLoadObject<UBlueprintGeneratedClass>(L"/Game/Abilities/Player/Constructor/Perks/ContainmentUnit/GE_Constructor_ContainmentUnit_Applied.GE_Constructor_ContainmentUnit_Applied_C");
+				LoadTables();
 			}
 		}
 
@@ -713,42 +687,17 @@ namespace Hooks
 			}
 		}
 
-		if (FuncName.contains("OnTriggerTouch"))
-		{
-			auto Params = (ABuildingTrap_OnTriggerTouch_Params*)Parms;
-			auto Trap = (ABuildingTrap*)Object;
-			
-			if (Trap)
-			{
-				AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Trap->GetOwningController();
-
-				if (PlayerController)
-				{
-					AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
-
-					if (Pawn) // idk
-					{
-						/*void OnBumpPushedPawn(class AFortPawn* InstigatedBy, float PushTimeLeft);
-						void LaunchCharacterJump(const struct FVector& LaunchVelocity, bool bXYOverride, bool bZOverride, bool bIgnoreFallDamage, bool bPlayFeedbackEvent);
-						void ApplyKnockback(float KnockbackMagnitude, float KnockbackZAngle, const struct FVector& ImpulseDir);*/
-					}
-				}
-			}
-		}
-
 		if (FuncName.contains("ClientOnPawnDied"))
 		{
 			auto Params = (AFortPlayerControllerZone_ClientOnPawnDied_Params*)Parms;
 			auto PlayerController = (AFortPlayerControllerZone*)Object;
-
-			LOG("ClientOnPawnDied");
 
 			if (PlayerController && PlayerController->Pawn)
 			{
 				FFortPlayerDeathReport DeathReport = Params->DeathReport;
 				Inventory* PlayerInventory = FindInventory(PlayerController);
 
-				ABP_VictoryDrone_C* VictoryDrone = (ABP_VictoryDrone_C*)(Util::SpawnActor(ABP_VictoryDrone_C::StaticClass(), PlayerController->Pawn->K2_GetActorLocation(), {}));
+				ABP_VictoryDrone_C* VictoryDrone = Util::SpawnActor<ABP_VictoryDrone_C>(ABP_VictoryDrone_C::StaticClass(), PlayerController->Pawn->K2_GetActorLocation());
 
 				VictoryDrone->PlaySpawnOutAnim();
 
@@ -793,6 +742,109 @@ namespace Hooks
 				}
 			}
 #endif
+		}
+
+		if (FuncName.contains("OnDamageServer"))
+		{
+			auto Params = (ABuildingActor_OnDamageServer_Params*)Parms;
+			auto Building = (ABuildingActor*)Object;
+
+			if (Building && Params->DamageCauser && Params->InstigatedBy && Building->IsA(ABuildingSMActor::StaticClass()))
+			{
+				AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Params->InstigatedBy;
+				ABuildingSMActor* BuildingActor = (ABuildingSMActor*)Building;
+				AFortWeapon* Weapon = (AFortWeapon*)Params->DamageCauser;
+
+				if (BuildingActor && Weapon && Weapon->WeaponData)
+				{
+					if (PlayerController && PlayerController->Pawn && !BuildingActor->bDestroyed && Weapon->WeaponData->IsA(UFortWeaponMeleeItemDefinition::StaticClass()))
+					{
+						Inventory* PlayerInventory = FindInventory(PlayerController);
+						UFortResourceItemDefinition* ItemDefinition = nullptr;
+
+						if (BuildingActor->ResourceType == EFortResourceType::Wood)
+						{
+							static auto WoodItemData = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/WoodItemData.WoodItemData");
+							ItemDefinition = WoodItemData;
+						}
+						else if (BuildingActor->ResourceType == EFortResourceType::Stone)
+						{
+							static auto StoneItemData = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/StoneItemData.StoneItemData");
+							ItemDefinition = StoneItemData;
+						}
+						else if (BuildingActor->ResourceType == EFortResourceType::Metal)
+						{
+							static auto MetalItemData = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/MetalItemData.MetalItemData");
+							ItemDefinition = MetalItemData;
+						}
+
+						if (PlayerInventory && ItemDefinition && BuildingActor->BuildingResourceAmountOverride.RowName.IsValid())
+						{
+							UCurveTable* CurveTable = FindObjectFast<UCurveTable>("/Game/Athena/Balance/DataTables/AthenaResourceRates.AthenaResourceRates");
+
+							if (!CurveTable)
+							{
+								StaticLoadObject<UCurveTable>(L"/Game/Athena/Balance/DataTables/AthenaResourceRates.AthenaResourceRates");
+								CurveTable = FindObjectFast<UCurveTable>("/Game/Athena/Balance/DataTables/AthenaResourceRates.AthenaResourceRates");
+								LOG("AthenaResourceRates Not Found!");
+							}								
+
+							if (CurveTable)
+							{
+								TEnumAsByte<EEvaluateCurveTableResult> OutResult;
+								FString ContextString;
+								float InXY = 0.f;
+								float OutXY;
+
+								Globals::DTFunctionLibrary->STATIC_EvaluateCurveTableRow(CurveTable, BuildingActor->BuildingResourceAmountOverride.RowName, InXY, ContextString, &OutResult, &OutXY);
+
+								int PotentialResourceCount = OutXY / (BuildingActor->GetMaxHealth() / Params->Damage);
+								int ResourceCount = round(PotentialResourceCount);
+
+								if (ResourceCount > 0)
+								{
+									PlayerController->ClientReportDamagedResourceBuilding(BuildingActor, BuildingActor->ResourceType, PotentialResourceCount, false, (Params->Damage == 100.f));
+
+									FGuid ItemGuid = PlayerInventory->GetItemGuid(ItemDefinition);
+									UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(ItemGuid);
+									int CountToRemove = 0;
+
+									if (ItemInstance)
+									{
+										PlayerInventory->RemoveItemFromInventory(ItemInstance->GetItemGuid());
+
+										ItemInstance->ItemEntry.Count = ItemInstance->ItemEntry.Count + ResourceCount;
+
+										if (ItemInstance->ItemEntry.Count > ItemDefinition->MaxStackSize)
+										{
+											CountToRemove = ItemInstance->ItemEntry.Count - ItemDefinition->MaxStackSize;
+											ItemInstance->ItemEntry.Count = ItemDefinition->MaxStackSize;
+										}
+
+										PlayerInventory->AddInventoryItem(ItemDefinition, ItemInstance->ItemEntry);
+									}
+									else
+									{
+										FFortItemEntry ItemEntry;
+										ItemEntry.Count = ResourceCount;
+
+										PlayerInventory->AddInventoryItem(ItemDefinition, ItemEntry);
+									}
+
+									if (CountToRemove > 0)
+									{
+										FFortItemEntry ItemEntry;
+										ItemEntry.Count = CountToRemove;
+										SpawnItem(ItemDefinition, ItemEntry, (AFortPawn*)PlayerController->Pawn, PlayerController->Pawn->K2_GetActorLocation());
+									}
+								}
+							}
+
+							PlayerInventory->UpdateInventory();
+						}
+					}
+				}
+			}
 		}
 
 		if (FuncName.contains("ServerHandlePickup"))
@@ -870,7 +922,7 @@ namespace Hooks
 									PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), ItemSlot, EFortQuickBars::Primary);
 
 								ItemEntry.Count = Params->Count;
-								PlayerInventory->SpawnItem(ItemDefinition, ItemEntry, Pawn->K2_GetActorLocation());
+								SpawnItem(ItemDefinition, ItemEntry, Pawn, Pawn->K2_GetActorLocation());
 							}
 						}
 
@@ -879,11 +931,294 @@ namespace Hooks
 							UFortWorldItem* PickaxeInstance = PlayerInventory->GetItemSlot(0, EFortQuickBars::Primary);
 
 							if (PickaxeInstance)
-								PlayerController->ServerExecuteInventoryItem(PickaxeInstance->GetItemGuid());
+							{
+								PlayerInventory->SetQuickBarSlot(0, EFortQuickBars::Primary);
+							}
 						}
 					}
 
 					PlayerInventory->UpdateInventory();
+				}
+			}
+		}
+
+		if (FuncName.contains("ServerCheat"))
+		{
+			auto Params = (AFortPlayerController_ServerCheat_Params*)Parms;
+			auto PlayerController = (AFortPlayerControllerAthena*)Object;
+
+#ifdef CHEATS
+			if (PlayerController && Params->Msg.IsValid())
+			{
+				std::string Command = Params->Msg.ToString();
+				std::vector<std::string> ParsedCommand = split(Command, ' ');
+				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
+
+				if (!ParsedCommand.empty())
+				{
+					std::string Action = ParsedCommand[0];
+					std::transform(Action.begin(), Action.end(), Action.begin(),
+						[](unsigned char c) { return std::tolower(c); });
+
+					FString Message = L"Unknown Command";
+
+					if (Action == "freebuild")
+					{
+						PlayerController->bBuildFree = PlayerController->bBuildFree ? false : true;
+						Message = PlayerController->bBuildFree ? L"FreeBuild on" : L"FreeBuild off";
+					}
+					else if (Action == "infiniteammo")
+					{
+						PlayerController->bInfiniteAmmo = PlayerController->bInfiniteAmmo ? false : true;
+						Message = PlayerController->bInfiniteAmmo ? L"InfiniteAmmo on" : L"InfiniteAmmo off";
+					}
+					else if (Action == "godmode" && Pawn)
+					{
+						Pawn->bIsInvulnerable = Pawn->bIsInvulnerable ? false : true;
+						Message = Pawn->bIsInvulnerable ? L"GodMode on" : L"GodMode off";
+					}
+					else if (Action == "giveweapon" && ParsedCommand.size() == 4 && Pawn)
+					{
+						std::string WeaponName = ParsedCommand[1];
+
+						bool bIsQuantityInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+						bool bIsLoadedAmmoInt = std::all_of(ParsedCommand[3].begin(), ParsedCommand[3].end(), ::isdigit);
+
+						if (bIsQuantityInt && bIsLoadedAmmoInt)
+						{
+							int Quantity = std::stoi(ParsedCommand[2]);
+							int LoadedAmmo = std::stoi(ParsedCommand[3]);
+
+							UFortWorldItemDefinition* ItemDefinition = FindObjectFast<UFortWorldItemDefinition>("/Game/Athena/Items/Weapons/" + WeaponName + "." + WeaponName);
+
+							if (ItemDefinition)
+							{
+								FFortItemEntry ItemEntry;
+								ItemEntry.Count = Quantity;
+								ItemEntry.LoadedAmmo = LoadedAmmo;
+
+								SpawnItem(ItemDefinition, ItemEntry, Pawn, Pawn->K2_GetActorLocation());
+
+								Message = L"Weapon Give!";
+							}
+							else
+							{
+								Message = L"The weapon does not exist";
+							}
+						}
+					}
+					else if (Action == "givetrap" && ParsedCommand.size() >= 3 && Pawn)
+					{
+						std::string TrapName = ParsedCommand[1];
+
+						bool bIsQuantityInt = std::all_of(ParsedCommand[2].begin(), ParsedCommand[2].end(), ::isdigit);
+
+						if (bIsQuantityInt)
+						{
+							int Quantity = std::stoi(ParsedCommand[2]);
+
+							UFortWorldItemDefinition* ItemDefinition = FindObjectFast<UFortWorldItemDefinition>("/Game/Athena/Items/Traps/" + TrapName + "." + TrapName);
+
+							if (ItemDefinition)
+							{
+								FFortItemEntry ItemEntry;
+								ItemEntry.Count = Quantity;
+
+								SpawnItem(ItemDefinition, ItemEntry, Pawn, Pawn->K2_GetActorLocation());
+
+								Message = L"Trap Give!";
+							}
+							else
+							{
+								Message = L"The trap does not exist";
+							}
+						}
+					}
+					else if (Action == "spawnloot" && ParsedCommand.size() >= 2 && Pawn)
+					{
+						std::string TypeLoot = ParsedCommand[1];
+
+						
+					}
+
+					PlayerController->ClientMessage(Message, FName(), 1);
+				}
+
+				LOG("Msg: " << Command);
+			}
+#endif // CHEATS
+		}
+
+
+		if (FuncName.contains("ServerCreateBuildingActor"))
+		{
+			auto Params = (AFortPlayerController_ServerCreateBuildingActor_Params*)Parms;
+			auto PlayerController = (AFortPlayerController*)Object;
+
+			if (PlayerController && PlayerController->Pawn)
+			{
+				AFortPawn* Pawn = (AFortPawn*)PlayerController->Pawn;
+
+#ifdef CHEATS
+				if (PlayerController->bBuildFree)
+					return ProcessEvent(Object, Function, Parms);
+#endif // CHEATS
+
+				if (Pawn)
+				{
+					AFortQuickBars* QuickBars = PlayerController->QuickBars;
+					Inventory* PlayerInventory = FindInventory(PlayerController);
+					AFortInventory* WorldInventory = PlayerController->WorldInventory;
+
+					if (QuickBars && PlayerInventory && WorldInventory)
+					{
+						int ItemSlot = QuickBars->SecondaryQuickBar.CurrentFocusedSlot;
+						UFortWorldItem* ItemInstance = PlayerInventory->GetItemSlot(ItemSlot, EFortQuickBars::Secondary);
+						UClass* BuildingClass = Params->BuildingClassData.BuildingClass;
+
+						UFortResourceItemDefinition* ItemDefinition = nullptr;
+
+						if (BuildingClass->GetName().contains("_W1_")) // Find another system
+						{
+							static auto WoodItemData = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/WoodItemData.WoodItemData");
+							ItemDefinition = WoodItemData;
+						}
+						else if (BuildingClass->GetName().contains("_S1_"))
+						{
+							static auto StoneItemData = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/StoneItemData.StoneItemData");
+							ItemDefinition = StoneItemData;
+						}
+						else if (BuildingClass->GetName().contains("_M1_"))
+						{
+							static auto MetalItemData = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/MetalItemData.MetalItemData");
+							ItemDefinition = MetalItemData;
+						}
+
+						if (ItemDefinition)
+						{
+							FGuid ItemGuid = PlayerInventory->GetItemGuid(ItemDefinition);
+							UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(ItemGuid);
+
+							if (ItemInstance)
+							{
+								if (ItemInstance->ItemEntry.Count > 0)
+									ProcessEvent(Object, Function, Parms);
+
+								PlayerInventory->RemoveItemFromInventory(ItemInstance->GetItemGuid());
+
+								ItemInstance->ItemEntry.Count = ItemInstance->ItemEntry.Count - 10;
+
+								if (ItemInstance->ItemEntry.Count > 0)
+								{
+									PlayerInventory->AddInventoryItem(ItemDefinition, ItemInstance->ItemEntry);
+								}
+							}
+						}
+
+						PlayerInventory->UpdateInventory();
+					}
+				}
+			}
+
+			return NULL;
+		}
+
+		if (FuncName.contains("ServerSpawnDeco"))
+		{
+			auto Params = (AFortDecoTool_ServerSpawnDeco_Params*)Parms;
+			auto DecoTool = (AFortDecoTool*)Object;
+
+			if (DecoTool)
+			{
+				AFortPawn* Pawn = (AFortPawn*)DecoTool->Owner;
+
+				if (Pawn)
+				{
+					AFortPlayerControllerAthena* PlayerController = (AFortPlayerControllerAthena*)Pawn->Controller;
+					Inventory* PlayerInventory = FindInventory(PlayerController);
+
+					if (PlayerController && PlayerInventory && DecoTool->WeaponData)
+					{
+						UFortWeaponItemDefinition* ItemDefinition = DecoTool->WeaponData;
+						FGuid ItemGuid = PlayerInventory->GetItemGuid(ItemDefinition);
+						UFortWorldItem* ItemInstance = PlayerInventory->GetItemInstance(ItemGuid);
+						AFortInventory* WorldInventory = PlayerController->WorldInventory;
+
+#ifdef CHEATS
+						if (PlayerController->bInfiniteAmmo)
+							return ProcessEvent(Object, Function, Parms);
+#endif // CHEATS
+
+						int TrapSlot = PlayerInventory->GetItemSlotQuickbar(ItemDefinition, EFortQuickBars::Secondary);
+
+						if (ItemInstance && WorldInventory)
+						{
+							ProcessEvent(Object, Function, Parms);
+
+							if (TrapSlot != -1)
+								PlayerInventory->RemoveItemFromQuickbar(ItemInstance->GetItemGuid(), EFortQuickBars::Secondary);
+
+							PlayerInventory->RemoveItemFromInventory(ItemInstance->GetItemGuid());
+
+							ItemInstance->ItemEntry.Count = ItemInstance->ItemEntry.Count - 1;
+
+							if (ItemInstance->ItemEntry.Count > 0)
+							{
+								UFortWorldItem* NewPickupWorldItem = PlayerInventory->AddInventoryItem(ItemDefinition, ItemInstance->ItemEntry);
+
+								if (TrapSlot != -1)
+									PlayerInventory->AddQuickBarItem(NewPickupWorldItem->GetItemGuid(), TrapSlot, EFortQuickBars::Secondary);
+							}
+							else
+							{
+								for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
+								{
+									UFortWorldItem* ItemInstance = WorldInventory->Inventory.ItemInstances[i];
+									if (!ItemInstance) continue;
+
+									EFortItemType ItemType = ItemInstance->GetType();
+									if (ItemType != EFortItemType::Trap) continue;
+
+									PlayerInventory->AddQuickBarItem(ItemInstance->GetItemGuid(), 4, EFortQuickBars::Secondary);
+									PlayerInventory->UpdateInventory();
+
+									return NULL;
+								}
+
+								UFortWorldItem* PickaxeInstance = PlayerInventory->GetItemSlot(0, EFortQuickBars::Primary);
+
+								if (PickaxeInstance)
+									PlayerController->ServerExecuteInventoryItem(PickaxeInstance->GetItemGuid());
+							}
+						}
+
+						PlayerInventory->UpdateInventory();
+					}
+				}
+			}
+
+			return NULL;
+		}
+
+		if (FuncName.contains("OnBuildingActorInitialized"))
+		{
+			auto Params = (ABuildingActor_OnBuildingActorInitialized_Params*)Parms;
+			auto Building = (ABuildingActor*)Object;
+
+			if (Building && Building->IsA(ABuildingSMActor::StaticClass()))
+			{
+				ABuildingSMActor* BuildingActor = (ABuildingSMActor*)Building;
+				auto PlayerController = (AFortPlayerControllerAthena*)BuildingActor->GetOwningController();
+
+				if (PlayerController)
+				{
+					AFortPlayerStateAthena* PlayerState = (AFortPlayerStateAthena*)PlayerController->PlayerState;
+
+					if (PlayerState)
+					{
+						BuildingActor->bPlayerPlaced = true;
+						BuildingActor->Team = PlayerState->TeamIndex;
+					}
 				}
 			}
 		}
@@ -894,16 +1229,6 @@ namespace Hooks
 
 			if (VictoryDrone)
 				VictoryDrone->K2_DestroyActor();
-		}
-
-		if (FuncName.contains("ReceiveDestroyed"))
-		{
-			AActor* Actor = (AActor*)Object;
-
-			if (Actor && bLogs)
-			{
-				LOG("ActorDestroy: " << Actor->GetName());
-			}
 		}
 
 		if (FuncName.contains("OnDeathServer"))
@@ -937,9 +1262,9 @@ namespace Hooks
 
 				auto Location = ReceivingActor->K2_GetActorLocation();
 
-				auto NewFortPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
-				auto NewFortPickup1 = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
-				auto NewFortPickup2 = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+				auto NewFortPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
+				auto NewFortPickup1 = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
+				auto NewFortPickup2 = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
 
 				auto AmmoDef = (UFortAmmoItemDefinition*)Globals::Ammo[rand() % Globals::Ammo.size()];
 				auto AmmoDef1 = (UFortAmmoItemDefinition*)Globals::Ammo[rand() % Globals::Ammo.size()];
@@ -970,7 +1295,7 @@ namespace Hooks
 
 				auto Location = ReceivingActor->K2_GetActorLocation();
 
-				auto NewFortPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+				auto NewFortPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
 
 				NewFortPickup->PrimaryPickupItemEntry.Count = 1;
 
@@ -1097,14 +1422,14 @@ namespace Hooks
 				if (NewFortPickup && NewFortPickup->PrimaryPickupItemEntry.ItemDefinition)
 				{
 					auto AmmoDefintion = ((UFortWorldItemDefinition*)NewFortPickup->PrimaryPickupItemEntry.ItemDefinition)->GetAmmoWorldItemDefinition_BP();
-					auto AmmoPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), NewFortPickup->K2_GetActorLocation(), {}));
+					auto AmmoPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), NewFortPickup->K2_GetActorLocation());
 					AmmoPickup->PrimaryPickupItemEntry.Count = AmmoDefintion->DropCount * 1.25;
 					AmmoPickup->PrimaryPickupItemEntry.ItemDefinition = AmmoDefintion;
 					AmmoPickup->OnRep_PrimaryPickupItemEntry();
 					AmmoPickup->TossPickup(Location, nullptr, 999);
 				}
 
-				auto NewFortPickup1 = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+				auto NewFortPickup1 = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
 
 				NewFortPickup1->PrimaryPickupItemEntry.Count = 1;
 				NewFortPickup1->PrimaryPickupItemEntry.ItemDefinition = Globals::Consumables[rand() % Globals::Consumables.size()];
@@ -1118,7 +1443,7 @@ namespace Hooks
 
 				auto Location = ReceivingActor->K2_GetActorLocation();
 
-				auto NewFortPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+				auto NewFortPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
 
 				NewFortPickup->PrimaryPickupItemEntry.Count = 1;
 				auto ItemDefinition = Globals::SupplyDrop[rand() % Globals::SupplyDrop.size()];
@@ -1127,180 +1452,32 @@ namespace Hooks
 				NewFortPickup->TossPickup(Location, nullptr, 1);
 
 				auto AmmoDefintion = ((UFortWorldItemDefinition*)NewFortPickup->PrimaryPickupItemEntry.ItemDefinition)->GetAmmoWorldItemDefinition_BP();
-				auto AmmoPickup = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), NewFortPickup->K2_GetActorLocation(), {}));
+				auto AmmoPickup = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), NewFortPickup->K2_GetActorLocation());
 				AmmoPickup->PrimaryPickupItemEntry.Count = 30;
 				AmmoPickup->OnRep_PrimaryPickupItemEntry();
 				AmmoPickup->TossPickup(Location, nullptr, 999);
 
-				auto NewFortPickup1 = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+				auto NewFortPickup1 = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
 
 				NewFortPickup1->PrimaryPickupItemEntry.Count = 1;
 				NewFortPickup1->PrimaryPickupItemEntry.ItemDefinition = Globals::Consumables[rand() % Globals::Consumables.size()];
 				NewFortPickup1->OnRep_PrimaryPickupItemEntry();
 				NewFortPickup1->TossPickup(Location, nullptr, 1);
 
-				auto NewFortPickup2 = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+				auto NewFortPickup2 = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
 
 				NewFortPickup2->PrimaryPickupItemEntry.Count = 1;
 				NewFortPickup2->PrimaryPickupItemEntry.ItemDefinition = Globals::Consumables[rand() % Globals::Consumables.size()];
 				NewFortPickup2->OnRep_PrimaryPickupItemEntry();
 				NewFortPickup2->TossPickup(Location, nullptr, 1);
 
-				auto NewFortPickup3 = reinterpret_cast<AFortPickupAthena*>(Util::SpawnActor(AFortPickupAthena::StaticClass(), Location, FRotator()));
+				auto NewFortPickup3 = Util::SpawnActor<AFortPickupAthena>(AFortPickupAthena::StaticClass(), Location);
 
 				NewFortPickup3->PrimaryPickupItemEntry.Count = 1;
 				NewFortPickup3->PrimaryPickupItemEntry.ItemDefinition = Globals::Traps[rand() % Globals::Traps.size()];
 				NewFortPickup3->OnRep_PrimaryPickupItemEntry();
 				NewFortPickup3->TossPickup(Location, nullptr, 1);
 			}
-		}
-
-#ifndef CHEATS
-		if (FuncName.contains("ServerCheat"))
-		{
-			return NULL;
-		}
-#endif
-	
-		if (FuncName.contains("OnDamageServer"))
-		{
-			if (!Object->IsA(ABuildingSMActor::StaticClass()))
-				return ProcessEvent(Object, Function, Parms);
-
-			auto BuildingActor = (ABuildingSMActor*)Object;
-			auto Params = (ABuildingActor_OnDamageServer_Params*)Parms;
-
-			if (Params->InstigatedBy && Params->InstigatedBy->IsA(AFortPlayerController::StaticClass()) && !BuildingActor->bPlayerPlaced)
-			{
-				auto FortController = (AFortPlayerController*)Params->InstigatedBy;
-				
-				if (FortController->MyFortPawn->CurrentWeapon && FortController->MyFortPawn->CurrentWeapon->WeaponData == FindObjectFast<UFortWeaponMeleeItemDefinition>("/Game/Athena/Items/Weapons/WID_Harvest_Pickaxe_Athena_C_T01.WID_Harvest_Pickaxe_Athena_C_T01"))
-					FortController->ClientReportDamagedResourceBuilding(BuildingActor, BuildingActor->ResourceType, Globals::MathLib->STATIC_RandomIntegerInRange(3, 6), false, false);
-			}
-		}
-
-		if (FuncName.contains("ClientReportDamagedResourceBuilding"))
-		{
-			auto PC = (AFortPlayerControllerAthena*)Object;
-			auto Params = (AFortPlayerController_ClientReportDamagedResourceBuilding_Params*)Parms;
-
-			if (PC && Params)
-			{
-				UFortResourceItemDefinition* ItemDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/WoodItemData.WoodItemData");
-
-				if (Params->PotentialResourceType == EFortResourceType::Wood)
-					ItemDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/WoodItemData.WoodItemData");
-
-				if (Params->PotentialResourceType == EFortResourceType::Stone)
-					ItemDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/StoneItemData.StoneItemData");
-
-				if (Params->PotentialResourceType == EFortResourceType::Metal)
-					ItemDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/MetalItemData.MetalItemData");
-					 
-				int Count = 0;
-
-				auto WorldInventory = PC->WorldInventory;
-
-				for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
-				{
-					auto ItemInstance = WorldInventory->Inventory.ItemInstances[i];
-
-					if (ItemInstance->GetItemDefinitionBP() == ItemDef)
-					{
-						WorldInventory->Inventory.ItemInstances.Remove(i);
-
-						for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
-						{
-							auto Entry = WorldInventory->Inventory.ReplicatedEntries[j];
-
-							if (Entry.ItemDefinition == ItemDef)
-							{
-								WorldInventory->Inventory.ReplicatedEntries.Remove(j);
-								Count = Entry.Count;
-							}
-						}
-					}
-				}
-
-				auto NewPickupWorldItem = (UFortWorldItem*)ItemDef->CreateTemporaryItemInstanceBP(Count + Params->PotentialResourceCount, 1);
-
-				NewPickupWorldItem->bTemporaryItemOwningController = true;
-				NewPickupWorldItem->SetOwningControllerForTemporaryItem(PC);
-
-				WorldInventory->Inventory.ItemInstances.Add(NewPickupWorldItem);
-				WorldInventory->Inventory.ReplicatedEntries.Add(NewPickupWorldItem->ItemEntry);
-
-				FindInventory((AFortPlayerController*)PC)->UpdateInventory();
-			}
-		}
-
-		if (FuncName.contains("ServerCreateBuildingActor"))
-		{
-			/*auto params = (AFortPlayerController_ServerCreateBuildingActor_Params*)(Parms);
-			auto BuildClass = params->BuildingClassData.BuildingClass;
-			auto Loc = params->BuildLoc;
-			auto Rot = params->BuildRot;
-
-			auto BuildingActor = (ABuildingSMActor*)Util::SpawnActor(BuildClass, Loc, Rot);
-			if (BuildingActor)
-			{
-				auto PC = (AFortPlayerController*)(Object);
-				
-				BuildingActor->Team = ((AFortPlayerStateAthena*)((AFortPlayerController*)Object)->PlayerState)->TeamIndex;
-				BuildingActor->bPlayerPlaced = true;
-				BuildingActor->ForceNetUpdate();
-				BuildingActor->InitializeKismetSpawnedBuildingActor(BuildingActor, PC);
-
-				UFortResourceItemDefinition* ResourceDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/WoodItemData.WoodItemData");
-
-				if (BuildingActor->ResourceType == EFortResourceType::Wood)
-					ResourceDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/WoodItemData.WoodItemData");
-
-				if (BuildingActor->ResourceType == EFortResourceType::Stone)
-					ResourceDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/StoneItemData.StoneItemData");
-
-				if (BuildingActor->ResourceType == EFortResourceType::Metal)
-					ResourceDef = FindObjectFast<UFortResourceItemDefinition>("/Game/Items/ResourcePickups/MetalItemData.MetalItemData");
-
-				if (ResourceDef)
-				{
-					auto WorldInventory = PC->WorldInventory;
-
-					for (int i = 0; i < WorldInventory->Inventory.ItemInstances.Num(); i++)
-					{
-						auto ItemInstance = WorldInventory->Inventory.ItemInstances[i];
-
-						if (ItemInstance->GetItemDefinitionBP() == ResourceDef)
-						{
-							int newCount = ItemInstance->ItemEntry.Count - 10;
-
-							WorldInventory->Inventory.ItemInstances.Remove(i);
-
-							for (int j = 0; j < WorldInventory->Inventory.ReplicatedEntries.Num(); j++)
-							{
-								auto Entry = WorldInventory->Inventory.ReplicatedEntries[j];
-
-								if (Entry.ItemDefinition == ResourceDef)
-								{
-									WorldInventory->Inventory.ReplicatedEntries.Remove(j);
-								}
-							}
-
-							if (newCount != 0)
-							{
-								auto NewWorldItem = (UFortWorldItem*)(ResourceDef->CreateTemporaryItemInstanceBP(newCount, 1));
-
-								WorldInventory->Inventory.ReplicatedEntries.Add(NewWorldItem->ItemEntry);
-								WorldInventory->Inventory.ItemInstances.Add(NewWorldItem);
-							}
-						}
-					}
-
-					FindInventory(PC)->UpdateInventory();
-				}
-			}
-
-			return NULL;*/
 		}
 
 		return ProcessEvent(Object, Function, Parms);
@@ -1315,21 +1492,27 @@ namespace Hooks
 
 		MH_CreateHook(reinterpret_cast<LPVOID>(PEAddr), ProcessEventHook, reinterpret_cast<LPVOID*>(&ProcessEvent));
 		MH_EnableHook(reinterpret_cast<LPVOID>(PEAddr));
-
-		MH_CreateHook((LPVOID)(BaseAddress + 0x2494000), Replication::AddToWorldHook, (LPVOID*)(&Replication::AddToWorld));
-		MH_EnableHook((LPVOID)(BaseAddress + 0x2494000));
-		MH_CreateHook((LPVOID)(BaseAddress + 0x253A570), Replication::ServerUpdateLevelVisibilityHook, (LPVOID*)(&Replication::ServerUpdateLevelVisibility));
-		MH_EnableHook((LPVOID)(BaseAddress + 0x253A570));
-		MH_CreateHook((LPVOID)(BaseAddress + 0x21D3D00), Replication::RequestLevelHook, (LPVOID*)(&Replication::RequestLevel));
-		MH_EnableHook((LPVOID)(BaseAddress + 0x21D3D00));
-		
-		Replication::IsGameWorld = decltype(Replication::IsGameWorld)(BaseAddress + 0x249C8B0);
-		Replication::GetWorldAssetPackageFName = decltype(Replication::GetWorldAssetPackageFName)(BaseAddress + 0x21CB7C0);
 		
 
 		/*MH_CreateHook((LPVOID)(BaseAddress + Offsets::PostGameplayEffectExecute), PostGameplayEffectExecuteHook, nullptr);
 		MH_EnableHook((LPVOID)(BaseAddress + Offsets::PostGameplayEffectExecute));*/
 
 		PickupInitialize = decltype(PickupInitialize)(BaseAddress + Offsets::PickupInitialize);
+
+		MH_CreateHook((LPVOID)(BaseAddress + Offsets::PickupCombine), PickupCombineHook, (LPVOID*)(&PickupCombine));
+		MH_EnableHook((LPVOID)(BaseAddress + Offsets::PickupCombine));
+
+		//TEST PICKUP: 0x681660 (void __fastcall sub_7FF66CCA1660(__int64 a1, __int64 a2))
+		//TEST PICKUP2: 0x67FDD0 (void **__fastcall sub_7FF66CC9FDD0(__int64 a1, __int64 a2, float a3, __int64 a4, char a5))
+		//TEST PICKUP3: 0x681F20 (char __fastcall sub_7FF66CCA1F20(__int64 a1))
+
+		/*MH_CreateHook((LPVOID)(BaseAddress + 0x681660), TestPickup1Hook, (LPVOID*)(&PickupCombine));
+		MH_EnableHook((LPVOID)(BaseAddress + 0x681660));
+		MH_CreateHook((LPVOID)(BaseAddress + 0x67FDD0), TestPickup2Hook, (LPVOID*)(&PickupCombine));
+		MH_EnableHook((LPVOID)(BaseAddress + 0x67FDD0));
+		MH_CreateHook((LPVOID)(BaseAddress + 0x681F20), TestPickup3Hook, (LPVOID*)(&PickupCombine));
+		MH_EnableHook((LPVOID)(BaseAddress + 0x681F20));*/
+
+		//PickupCombine = decltype(PickupCombine)(BaseAddress + Offsets::PickupCombine);
 	}
 }
